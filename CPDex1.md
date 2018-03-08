@@ -36,8 +36,8 @@ Trecv (time receiving data)
 
 ```
 P0: Tsl | Tsl | ...
-P1: 	| Tsr | Trecv	| ...
-P2:		 	  | Tsr 	| Trecv ...
+P1:     | Tsr | Trecv	| ...
+P2:           | Tsr 	| Trecv ...
 ```
 
 Speedup is
@@ -61,8 +61,10 @@ N*Tsl + Trecv +  2(matrices)*Trecv*4(bytes)*SIZE*SIZE/N + 100ns*SIZE*SIZE/N + 4*
 
 ### b)
 
+```
 S(100x100) = 15.95
 S(1000*1000) = 89.24
+```
 
 In the first case, there is communication overhead.
 In the second case, one process will calculate more than on line, so the communication time doesnt' matter as much.
