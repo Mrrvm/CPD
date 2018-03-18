@@ -1,1 +1,2 @@
-# Parallel-and-Distributed-Computing-
+# CPD
+Parallel and Distributed Computing course
