@@ -51,6 +51,6 @@ int main(int argc, char const *argv[]) {
         printf("\n");
     }
 
-  fclose(sudoku_file);
-  return 0;
+    fclose(sudoku_file);
+    return 0;
 }
