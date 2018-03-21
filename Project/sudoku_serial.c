@@ -58,6 +58,60 @@ bool safe(int **grid, int row, int col, int num) {
            valid_in_row(grid, row, num);
 }
 
+int last_square(row, col) {
+  return ((row) == (N-1) && (col) == (N-1));
+}
+
+void nxt_row(row, col) {
+  return ((col) < (N-1)) ? (row) : (row+1);
+}
+
+void nxt_col(row, col) {
+  return ((col) < (N-1)) ? (col+1) : 0;
+}
+
+int solve(int **grid, int row, int col) {
+  int num;
+
+  if (M[row][col] != 0) {
+    /* This square had an initial number. */
+
+    if (last_square(row, col)) {
+      /* Puzzle solved (leaf). */
+
+      return 1;
+    } else if (solve(M, nxt_row(row, col), nxt_col(row, col)) == 1) {
+      /* Puzzle solved (branch). */
+
+      return 1;
+    }
+  } else if {
+    /* This square is empty. */
+
+    /* Try all valid solutions. */
+    for (num = 1; num <= 9; num++) {
+      if (safe(M, row, col, num)) {
+        M[row][col] = num;  /* Tries this number. */
+
+        if (last_square(row, col)) {
+          /* Puzzle solved (leaf). */
+
+          return 1;
+        } else if (solve(M, nxt_row(row, col), nxt_col(row, col)) == 1) {
+          /* Puzzle solved (branch). */
+
+          return 1;
+        }
+
+        M[row][col] = 0;  /* Deletes change. */
+      }
+    }
+  }
+
+  /* There is no solution for this puzzle. */
+  return 0;
+}
+
 int main(int argc, char const *argv[]) {
 
     FILE *sudoku_file;
@@ -97,6 +151,15 @@ int main(int argc, char const *argv[]) {
         }
         printf("\n");
     }
+
+    // Solve the puzzle
+    if (solve(matrix, 0, 0) == 1) {
+      // Solution found
+
+    } else {
+      // No solution
+
+    };
 
     fclose(sudoku_file);
     return 0;
