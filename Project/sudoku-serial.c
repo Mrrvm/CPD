@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #define N_ARGS 2
 #define EMPTY 0
@@ -51,7 +52,7 @@ sudoku *init_sudoku(int box_size) {
 void print_grid() {
     for (int row = 0; row < to_solve->n; row++) {
         for (int col = 0; col < to_solve->n; col++)
-            printf("%2d", to_solve->grid[row][col]);
+            printf("%2d ", to_solve->grid[row][col]);
         printf("\n");
     }
 }
@@ -119,7 +120,7 @@ int solve(int row, int col) {
         /* This square is empty. */
 
         /* Try all valid solutions. */
-        for (num = 1; num <= 9; num++) {
+        for (num = 1; num <= to_solve->n; num++) {
             if (safe(row, col, num)) {
                 to_solve->grid[row][col] = num; /* Tries this number. */
 
@@ -159,7 +160,7 @@ int read_file(const char *filename) {
     // Read the file
     for (int i = 0; i < to_solve->n; i++) {
         for (int j = 0; j < to_solve->n; j++) {
-            fscanf(sudoku_file, "%c", *(to_solve->grid + i) + j);
+            fscanf(sudoku_file, "%2" SCNu8, *(to_solve->grid + i) + j);
         }
     }
 
@@ -179,6 +180,9 @@ int main(int argc, char const *argv[]) {
         sprintf(error, "Unable to read file %s\n", argv[1]);
         print_error(error);
     }
+
+    print_grid();
+    printf("\n");
 
     // Solve the puzzle
     if (solve(0, 0) == 1) {
