@@ -11,7 +11,7 @@ serial: sudoku-serial.c
 	$(CC) sudoku-serial.c $(CFLAGS) -o $(BINARY)-serial
 
 omp: sudoku-omp.c
-	$(CC) sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-serial
+	$(CC) sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-omp
 
 clean:
 	-rm $(BINARY)*

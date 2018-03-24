@@ -22,6 +22,13 @@ void print_error(char *error) {
     exit(EXIT_FAILURE);
 }
 
+void free_sudoku(sudoku *to_free) {
+    for (int i = 0; i < to_free->n; i++) {
+        free(to_free->grid[i]);
+    }
+    free(to_free);
+}
+
 sudoku *init_sudoku(int box_size) {
     sudoku *new_sudoku = (sudoku *)malloc(sizeof(sudoku));
 
@@ -183,5 +190,6 @@ int main(int argc, char const *argv[]) {
         // No solution
     };
 
+    free_sudoku(to_solve);
     return 0;
 }
