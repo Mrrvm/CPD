@@ -7,6 +7,9 @@ all: client
 
 default:	client
 
+serial: sudoku_serial.c
+	$(CC) sudoku_serial.c $(CFLAGS) -o $(BINARY)
+
 client: $(wildcard *.c)
 	$(CC) $(wildcard *.c) $(CFLAGS) -o $(BINARY)
 
@@ -14,4 +17,4 @@ clean:
 	-rm $(BINARY)
 	-rm $(wildcard *.o)
 
-.PHONY: default all clean test
+.PHONY: default all clean test serial

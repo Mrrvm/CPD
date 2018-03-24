@@ -18,7 +18,7 @@ void print_error(char *error) {
 }
 
 // Print grid
-void printGrid(int grid[N][N]) {
+void print_grid(int **grid) {
     for (int row = 0; row < N; row++) {
         for (int col = 0; col < N; col++)
             printf("%2d", grid[row][col]);
@@ -58,58 +58,58 @@ bool safe(int **grid, int row, int col, int num) {
            valid_in_row(grid, row, num);
 }
 
-int last_square(row, col) {
-  return ((row) == (N-1) && (col) == (N-1));
+int last_square(int row, int col) {
+    return ((row) == (N - 1) && (col) == (N - 1));
 }
 
-void nxt_row(row, col) {
-  return ((col) < (N-1)) ? (row) : (row+1);
+int nxt_row(int row, int col) {
+    return ((col) < (N - 1)) ? (row) : (row + 1);
 }
 
-void nxt_col(row, col) {
-  return ((col) < (N-1)) ? (col+1) : 0;
+int nxt_col(int col) {
+    return ((col) < (N - 1)) ? (col + 1) : 0;
 }
 
 int solve(int **grid, int row, int col) {
-  int num;
+    int num;
 
-  if (M[row][col] != 0) {
-    /* This square had an initial number. */
-
-    if (last_square(row, col)) {
-      /* Puzzle solved (leaf). */
-
-      return 1;
-    } else if (solve(M, nxt_row(row, col), nxt_col(row, col)) == 1) {
-      /* Puzzle solved (branch). */
-
-      return 1;
-    }
-  } else if {
-    /* This square is empty. */
-
-    /* Try all valid solutions. */
-    for (num = 1; num <= 9; num++) {
-      if (safe(M, row, col, num)) {
-        M[row][col] = num;  /* Tries this number. */
+    if (grid[row][col] != 0) {
+        /* This square had an initial number. */
 
         if (last_square(row, col)) {
-          /* Puzzle solved (leaf). */
+            /* Puzzle solved (leaf). */
 
-          return 1;
-        } else if (solve(M, nxt_row(row, col), nxt_col(row, col)) == 1) {
-          /* Puzzle solved (branch). */
+            return 1;
+        } else if (solve(grid, nxt_row(row, col), nxt_col(col)) == 1) {
+            /* Puzzle solved (branch). */
 
-          return 1;
+            return 1;
         }
+    } else {
+        /* This square is empty. */
 
-        M[row][col] = 0;  /* Deletes change. */
-      }
+        /* Try all valid solutions. */
+        for (num = 1; num <= 9; num++) {
+            if (safe(grid, row, col, num)) {
+                grid[row][col] = num; /* Tries this number. */
+
+                if (last_square(row, col)) {
+                    /* Puzzle solved (leaf). */
+
+                    return 1;
+                } else if (solve(grid, nxt_row(row, col), nxt_col(col)) == 1) {
+                    /* Puzzle solved (branch). */
+
+                    return 1;
+                }
+
+                grid[row][col] = 0; /* Deletes change. */
+            }
+        }
     }
-  }
 
-  /* There is no solution for this puzzle. */
-  return 0;
+    /* There is no solution for this puzzle. */
+    return 0;
 }
 
 int main(int argc, char const *argv[]) {
@@ -154,11 +154,12 @@ int main(int argc, char const *argv[]) {
 
     // Solve the puzzle
     if (solve(matrix, 0, 0) == 1) {
-      // Solution found
-
+        print_grid(matrix);
+        printf("Solved Sudoku\n");
+        // Solution found
     } else {
-      // No solution
-
+        printf("Did not solve Sudoku\n");
+        // No solution
     };
 
     fclose(sudoku_file);
