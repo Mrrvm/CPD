@@ -1,20 +1,20 @@
 CC = gcc
-CFLAGS = -fopenmp -march=native -std=gnu11 -Wall -Wextra -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
+CFLAGS = -march=native -std=gnu11 -Wall -Wextra -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
 CFLAGS_RELEASE = -march=native -std=gnu11 -O2
 BINARY = kuduro
 
-all: client
+all: serial omp
 
-default:	client
+default: omp
 
-serial: sudoku_serial.c
-	$(CC) sudoku_serial.c $(CFLAGS) -o $(BINARY)
+serial: sudoku-serial.c
+	$(CC) sudoku-serial.c $(CFLAGS) -o $(BINARY)-serial
 
-client: $(wildcard *.c)
-	$(CC) $(wildcard *.c) $(CFLAGS) -o $(BINARY)
+omp: sudoku-omp.c
+	$(CC) sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-serial
 
 clean:
-	-rm $(BINARY)
+	-rm $(BINARY)*
 	-rm $(wildcard *.o)
 
-.PHONY: default all clean test serial
+.PHONY: default all clean test serial omp
