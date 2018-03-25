@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -march=native -std=gnu11 -Wall -Wextra -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
-CFLAGS_RELEASE = -march=native -std=gnu11 -O2
+CFLAGS = -march=native -std=gnu11 -Wall -Wextra -Werror -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
+CFLAGS_RELEASE = -march=native -std=gnu11 -O2 -Os
 BINARY = kuduro
 
 all: serial omp

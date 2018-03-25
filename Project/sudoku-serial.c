@@ -1,19 +1,19 @@
 // Sudoku Solver
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
 
 #define N_ARGS 2
 #define EMPTY 0
 
 typedef struct sudoku_struct {
-    int n;
-    int box_size;
-    uint8_t **grid;
+    int_fast32_t n;
+    int_fast32_t box_size;
+    uint_fast8_t **grid;
 } sudoku;
 
 sudoku *to_solve;
