@@ -11,10 +11,17 @@
 #define N_ARGS 2
 #define EMPTY 0
 
+typedef struct square_struct {
+  int_fast32_t row;
+  int_fast32_t col;
+} square;
+
 typedef struct sudoku_struct {
     int_fast32_t n;
     int_fast32_t box_size;
     uint_fast8_t **grid;
+    int_fast32_t n_plays;
+    square *empty_sq;
 } sudoku;
 
 sudoku *to_solve;
@@ -36,6 +43,8 @@ sudoku *init_sudoku(int box_size) {
 
     new_sudoku->box_size = box_size;
     new_sudoku->n = box_size * box_size;
+    new_sudoku->n_plays = 0;
+    new_sudoku->empty_sq = NULL;
 
     // Allocate matrix
     new_sudoku->grid = (uint8_t **)malloc(new_sudoku->n * sizeof(uint8_t *));
@@ -118,83 +127,66 @@ int prev_col(int col) {
 int solve() {
 
     uint8_t *plays = NULL;
-    int ptr = 0;
-    int row = 0, col = 0;
+    int ptr;
     int N = to_solve->n;
-    int nplays = N*N;
+    int nplays = to_solve->n_plays;
 
     /* Array to keep history of previous plays (for backtracking) */
     /* One for each empty square of the initial sudoku */
     plays = (uint8_t*) malloc(nplays*sizeof(uint8_t));
+
     /* Next play to try. */
+    ptr = 0;
     plays[0] = 1;
 
     while(1) {
-        if(to_solve->grid[row][col] != 0) {
-        /* This square had an initial number. */
-
-            plays[ptr] = 0;
-            if (last_square(row, col)) {
-                /* Puzzle solved */
-                return 1;
-
-            } else {
-                /* Branch */
-                ptr++;
-                plays[ptr] = 1;
-                row = nxt_row(row, col); col = nxt_col(col);
-            }
-        } else {
         /* This square is empty. */
+        //printf("r: %ld ; c: %ld ; play: %2" SCNu8 "\n", to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col, plays[ptr]);
 
-            if(plays[ptr] > N) {
-                if(ptr == 0) {
-                    /* No solution */
-                    return 0;
-                }
-                else {
-                    /* Backtrack */
-                    ptr--;
-                    row = prev_row(row, col); col = prev_col(col);
-                    while(plays[ptr] == 0) {
-                        ptr--;
-                        row = prev_row(row, col); col = prev_col(col); 
-                        if(first_square(row, col)) {
-                            /* No solution */
-                            return 0;
-                        }
-                    }
-                    plays[ptr]++;
-                    to_solve->grid[row][col] = 0;
-                    continue;
-                }
-            }
-
-            if(safe(row, col, plays[ptr])) {
-                to_solve->grid[row][col] = plays[ptr];
-                plays[ptr]++;
-                if(last_square(row, col)) {
-                    /* Puzzle solved */
-                    return 1;
-
-                } else {
-                    /* Branch */
-                    ptr++;
-                    plays[ptr] = 1;
-                    row = nxt_row(row, col); col = nxt_col(col);
-                }
+        /* Check if branch options are emptied. */
+        if(plays[ptr] > N) {
+            if(ptr == 0) {
+                /* No solution */
+                return 0;
             }
             else {
-                /* Try again*/
-                plays[ptr]++;
+                /* Backtrack */
+                ptr--;
+
+                to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] = 0;
+                continue;
             }
         }
+
+        /* Check if next play is valid. */
+        if(safe(to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col, plays[ptr])) {
+            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] = plays[ptr];
+            plays[ptr]++; /* always to next */
+
+            ptr++;
+            if(ptr < nplays) {
+                /* Branch */
+
+                plays[ptr] = 1;
+            } else {
+                /* Puzzle solved */
+
+                return 1;
+            }
+        }
+        else {
+            /* Try again*/
+            plays[ptr]++;
+        }
     }
+
 }
 
 int read_file(const char *filename) {
     FILE *sudoku_file;
     int box_size;
+    int iter;
+    uint8_t num;
 
     // Opens file
     sudoku_file = fopen(filename, "r");
@@ -207,9 +199,31 @@ int read_file(const char *filename) {
     to_solve = init_sudoku(box_size);
 
     // Read the file
+    iter = 0;
     for (int i = 0; i < to_solve->n; i++) {
         for (int j = 0; j < to_solve->n; j++) {
-            fscanf(sudoku_file, "%2" SCNu8, *(to_solve->grid + i) + j);
+            fscanf(sudoku_file, "%2" SCNu8, &num);
+
+            to_solve->grid[i][j] = num;
+            if (num == 0) {
+              iter++;
+            }
+        }
+    }
+
+    // Create aux array of empty squares
+    to_solve->n_plays = iter;
+    to_solve->empty_sq = (square *)malloc(iter * sizeof(square));
+
+    iter = 0;
+    for (int i = 0; i < to_solve->n; i++) {
+        for (int j = 0; j < to_solve->n; j++) {
+            if (to_solve->grid[i][j] == 0) {
+              to_solve->empty_sq[iter].row = i;
+              to_solve->empty_sq[iter].col = j;
+
+              iter++;
+            }
         }
     }
 
