@@ -14,6 +14,7 @@
 typedef struct square_struct {
   int_fast32_t row;
   int_fast32_t col;
+  int_fast32_t box;
 } square;
 
 typedef struct sudoku_struct {
@@ -99,31 +100,6 @@ bool safe(int row, int col, int num) {
            valid_in_row(row, num);
 }
 
-int last_square(int row, int col) {
-    return ((row) == (to_solve->n - 1) && (col) == (to_solve->n - 1));
-}
-
-int first_square(int row, int col) {
-    return ((row) == 0 && (col) == 0);
-}
-
-int nxt_row(int row, int col) {
-    return (col < (to_solve->n - 1) || row == (to_solve->n - 1)) ? (row) : (row + 1);
-}
-
-int nxt_col(int col) {
-    return (col < (to_solve->n - 1)) ? (col + 1) : 0;
-}
-
-int prev_row(int row, int col) {
-    return (col > 0 || row == 0) ? (row) : (row - 1);
-}
-
-int prev_col(int col) {
-    return (col > 0) ? (col - 1) : (to_solve->n - 1);
-}
-
-
 int solve() {
 
     uint8_t *plays = NULL;
@@ -141,11 +117,13 @@ int solve() {
 
     while(1) {
         /* This square is empty. */
-        //printf("r: %ld ; c: %ld ; play: %2" SCNu8 "\n", to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col, plays[ptr]);
+        printf("r: %ld ; c: %ld ; b: %ld ; play: %2" SCNu8 "\n",
+          to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col,
+          to_solve->empty_sq[ptr].box, plays[ptr]);
 
         /* Check if branch options are emptied. */
         if(plays[ptr] > N) {
-            if(ptr == 0) {
+            if (ptr == 0) {
                 /* No solution */
                 return 0;
             }
@@ -221,6 +199,8 @@ int read_file(const char *filename) {
             if (to_solve->grid[i][j] == 0) {
               to_solve->empty_sq[iter].row = i;
               to_solve->empty_sq[iter].col = j;
+              to_solve->empty_sq[iter].box =
+                (i/to_solve->box_size)*to_solve->box_size + j/to_solve->box_size;
 
               iter++;
             }
