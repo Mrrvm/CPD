@@ -94,54 +94,102 @@ int last_square(int row, int col) {
     return ((row) == (to_solve->n - 1) && (col) == (to_solve->n - 1));
 }
 
+int first_square(int row, int col) {
+    return ((row) == 0 && (col) == 0);
+}
+
 int nxt_row(int row, int col) {
-    return ((col) < (to_solve->n - 1)) ? (row) : (row + 1);
+    return (col < (to_solve->n - 1) || row == (to_solve->n - 1)) ? (row) : (row + 1);
 }
 
 int nxt_col(int col) {
-    return ((col) < (to_solve->n - 1)) ? (col + 1) : 0;
+    return (col < (to_solve->n - 1)) ? (col + 1) : 0;
 }
 
-int solve(int row, int col) {
-    int num;
+int prev_row(int row, int col) {
+    return (col > 0 || row == 0) ? (row) : (row - 1);
+}
 
-    if (to_solve->grid[row][col] != 0) {
+int prev_col(int col) {
+    return (col > 0) ? (col - 1) : (to_solve->n - 1);
+}
+
+
+int solve() {
+
+    uint8_t *plays = NULL;
+    int ptr = 0;
+    int row = 0, col = 0;
+    int N = to_solve->n;
+    int nplays = N*N;
+
+    /* Array to keep history of previous plays (for backtracking) */
+    /* One for each empty square of the initial sudoku */
+    plays = (uint8_t*) malloc(nplays*sizeof(uint8_t));
+    /* Next play to try. */
+    plays[0] = 1;
+
+    while(1) {
+        if(to_solve->grid[row][col] != 0) {
         /* This square had an initial number. */
 
-        if (last_square(row, col)) {
-            /* Puzzle solved (leaf). */
+            plays[ptr] = 0;
+            if (last_square(row, col)) {
+                /* Puzzle solved */
+                return 1;
 
-            return 1;
-        } else if (solve(nxt_row(row, col), nxt_col(col)) == 1) {
-            /* Puzzle solved (branch). */
-
-            return 1;
-        }
-    } else {
+            } else {
+                /* Branch */
+                ptr++;
+                plays[ptr] = 1;
+                row = nxt_row(row, col); col = nxt_col(col);
+            }
+        } else {
         /* This square is empty. */
 
-        /* Try all valid solutions. */
-        for (num = 1; num <= to_solve->n; num++) {
-            if (safe(row, col, num)) {
-                to_solve->grid[row][col] = num; /* Tries this number. */
-
-                if (last_square(row, col)) {
-                    /* Puzzle solved (leaf). */
-
-                    return 1;
-                } else if (solve(nxt_row(row, col), nxt_col(col)) == 1) {
-                    /* Puzzle solved (branch). */
-
-                    return 1;
+            if(plays[ptr] > N) {
+                if(ptr == 0) {
+                    /* No solution */
+                    return 0;
                 }
+                else {
+                    /* Backtrack */
+                    ptr--;
+                    row = prev_row(row, col); col = prev_col(col);
+                    while(plays[ptr] == 0) {
+                        ptr--;
+                        row = prev_row(row, col); col = prev_col(col); 
+                        if(first_square(row, col)) {
+                            /* No solution */
+                            return 0;
+                        }
+                    }
+                    plays[ptr]++;
+                    to_solve->grid[row][col] = 0;
+                    continue;
+                }
+            }
 
-                to_solve->grid[row][col] = 0; /* Deletes change. */
+            if(safe(row, col, plays[ptr])) {
+                to_solve->grid[row][col] = plays[ptr];
+                plays[ptr]++;
+                if(last_square(row, col)) {
+                    /* Puzzle solved */
+                    return 1;
+
+                } else {
+                    /* Branch */
+                    ptr++;
+                    plays[ptr] = 1;
+                    row = nxt_row(row, col); col = nxt_col(col);
+                }
+            }
+            else {
+                /* Try again*/
+                plays[ptr]++;
             }
         }
     }
-
-    /* There is no solution for this puzzle. */
-    return 0;
 }
 
 int read_file(const char *filename) {
@@ -190,7 +238,7 @@ int main(int argc, char const *argv[]) {
 
     begin = clock();
     // Solve the puzzle
-    if (solve(0, 0) == 1) {
+    if (solve() == 1) {
         end = clock();
         print_grid();
         printf("Solved Sudoku\n");
