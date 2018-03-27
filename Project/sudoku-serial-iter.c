@@ -22,6 +22,7 @@ typedef struct sudoku_struct {
     int_fast32_t box_size;
     uint_fast8_t **grid;
     int_fast32_t n_plays;
+    uint_fast8_t *plays;
     square *empty_sq;
 } sudoku;
 
@@ -100,7 +101,7 @@ int solve() {
 
     /* Array to keep history of previous plays (for backtracking) */
     /* One for each empty square of the initial sudoku */
-    uint8_t *plays = (uint8_t *)malloc(to_solve->n_plays * sizeof(uint8_t));
+    uint8_t *plays = to_solve->plays;
 
     /* Next play to try. */
     ptr = 0;
@@ -186,6 +187,7 @@ int read_file(const char *filename) {
     // Create aux array of empty squares
     to_solve->n_plays = iter;
     to_solve->empty_sq = (square *)malloc(iter * sizeof(square));
+    to_solve->plays = (uint8_t *)malloc(to_solve->n_plays * sizeof(uint8_t));
 
     iter = 0;
     for (int i = 0; i < to_solve->n; i++) {
