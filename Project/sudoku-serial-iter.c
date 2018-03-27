@@ -80,28 +80,21 @@ bool valid_in_box(int row, int col, int num) {
     return true;
 }
 
-bool valid_in_row(int row, int num) {
-    for (int j = 0; j < to_solve->n; j++)
-        if (to_solve->grid[row][j] == num)
+bool valid_in_col_and_row(int col, int row, int num) {
+    for (int i = 0; i < to_solve->n; i++) {
+        if (to_solve->grid[i][col] == num || to_solve->grid[row][i] == num) {
             return false;
-    return true;
-}
-
-bool valid_in_col(int col, int num) {
-    for (int i = 0; i < to_solve->n; i++)
-        if (to_solve->grid[i][col] == num)
-            return false;
+        }
+    }
     return true;
 }
 
 // Check if it is safe to put number in position
 bool safe(int row, int col, int num) {
-    return valid_in_box(row, col, num) && valid_in_col(col, num) &&
-           valid_in_row(row, num);
+    return valid_in_box(row, col, num) && valid_in_col_and_row(col, row, num);
 }
 
 int solve() {
-
     uint8_t *plays = NULL;
     int ptr;
     int N = to_solve->n;
@@ -249,5 +242,5 @@ int main(int argc, char const *argv[]) {
 
     free_sudoku(to_solve);
     printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
-  return 0;
+    return 0;
 }
