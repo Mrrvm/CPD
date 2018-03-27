@@ -12,9 +12,9 @@
 #define EMPTY 0
 
 typedef struct square_struct {
-  int_fast32_t row;
-  int_fast32_t col;
-  int_fast32_t box;
+    int_fast32_t row;
+    int_fast32_t col;
+    int_fast32_t box;
 } square;
 
 typedef struct sudoku_struct {
@@ -109,13 +109,13 @@ int solve() {
 
     /* Array to keep history of previous plays (for backtracking) */
     /* One for each empty square of the initial sudoku */
-    plays = (uint8_t*) malloc(nplays*sizeof(uint8_t));
+    plays = (uint8_t *)malloc(nplays * sizeof(uint8_t));
 
     /* Next play to try. */
     ptr = 0;
     plays[0] = 1;
 
-    while(1) {
+    while (1) {
         /* This square is empty. */
         /*
         printf("r: %ld ; c: %ld ; b: %ld ; play: %2" SCNu8 "\n",
@@ -124,27 +124,30 @@ int solve() {
         */
 
         /* Check if branch options are emptied. */
-        if(plays[ptr] > N) {
+        if (plays[ptr] > N) {
             if (ptr == 0) {
                 /* No solution */
                 return 0;
-            }
-            else {
+            } else {
                 /* Backtrack */
                 ptr--;
 
-                to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] = 0;
+                to_solve
+                ->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
+                    0;
                 continue;
             }
         }
 
         /* Check if next play is valid. */
-        if(safe(to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col, plays[ptr])) {
-            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] = plays[ptr];
+        if (safe(to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col,
+                 plays[ptr])) {
+            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
+                plays[ptr];
             plays[ptr]++; /* always to next */
 
             ptr++;
-            if(ptr < nplays) {
+            if (ptr < nplays) {
                 /* Branch */
 
                 plays[ptr] = 1;
@@ -153,13 +156,11 @@ int solve() {
 
                 return 1;
             }
-        }
-        else {
+        } else {
             /* Try again*/
             plays[ptr]++;
         }
     }
-
 }
 
 int read_file(const char *filename) {
@@ -186,7 +187,7 @@ int read_file(const char *filename) {
 
             to_solve->grid[i][j] = num;
             if (num == 0) {
-              iter++;
+                iter++;
             }
         }
     }
@@ -199,12 +200,13 @@ int read_file(const char *filename) {
     for (int i = 0; i < to_solve->n; i++) {
         for (int j = 0; j < to_solve->n; j++) {
             if (to_solve->grid[i][j] == 0) {
-              to_solve->empty_sq[iter].row = i;
-              to_solve->empty_sq[iter].col = j;
-              to_solve->empty_sq[iter].box =
-                (i/to_solve->box_size)*to_solve->box_size + j/to_solve->box_size;
+                to_solve->empty_sq[iter].row = i;
+                to_solve->empty_sq[iter].col = j;
+                to_solve->empty_sq[iter].box =
+                    (i / to_solve->box_size) * to_solve->box_size +
+                    j / to_solve->box_size;
 
-              iter++;
+                iter++;
             }
         }
     }
@@ -247,5 +249,5 @@ int main(int argc, char const *argv[]) {
 
     free_sudoku(to_solve);
     printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
-    return 0;
+  return 0;
 }
