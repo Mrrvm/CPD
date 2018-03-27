@@ -75,8 +75,9 @@ bool valid_in_box(int row, int col, int num) {
 
     for (int i = 0; i < to_solve->box_size; i++)
         for (int j = 0; j < to_solve->box_size; j++)
-            if (to_solve->grid[i + row_start][j + col_start] == num)
+            if (to_solve->grid[i + row_start][j + col_start] == num) {
                 return false;
+            }
     return true;
 }
 
@@ -95,14 +96,13 @@ bool safe(int row, int col, int num) {
 }
 
 int solve() {
-    uint8_t *plays = NULL;
     int ptr;
     int N = to_solve->n;
     int nplays = to_solve->n_plays;
 
     /* Array to keep history of previous plays (for backtracking) */
     /* One for each empty square of the initial sudoku */
-    plays = (uint8_t *)malloc(nplays * sizeof(uint8_t));
+    uint8_t *plays = (uint8_t *)malloc(nplays * sizeof(uint8_t));
 
     /* Next play to try. */
     ptr = 0;
@@ -123,15 +123,13 @@ int solve() {
 
                 free(plays);
                 return 0;
-            } else {
-                /* Backtrack */
-                ptr--;
-
-                to_solve
-                ->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
-                    0;
-                continue;
             }
+            /* Backtrack */
+            ptr--;
+
+            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
+                0;
+            continue;
         }
 
         /* Check if next play is valid. */
