@@ -117,9 +117,11 @@ int solve() {
 
     while(1) {
         /* This square is empty. */
+        /*
         printf("r: %ld ; c: %ld ; b: %ld ; play: %2" SCNu8 "\n",
           to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col,
           to_solve->empty_sq[ptr].box, plays[ptr]);
+        */
 
         /* Check if branch options are emptied. */
         if(plays[ptr] > N) {
