@@ -120,6 +120,8 @@ int solve() {
         if (plays[ptr] > N) {
             if (ptr == 0) {
                 /* No solution */
+
+                free(plays);
                 return 0;
             } else {
                 /* Backtrack */
@@ -146,7 +148,7 @@ int solve() {
                 plays[ptr] = 1;
             } else {
                 /* Puzzle solved */
-
+                free(plays);
                 return 1;
             }
         } else {
@@ -229,7 +231,7 @@ int main(int argc, char const *argv[]) {
 
     begin = clock();
     // Solve the puzzle
-    if (solve() == 1) {
+    if (solve()) {
         end = clock();
         print_grid();
         printf("Solved Sudoku\n");
