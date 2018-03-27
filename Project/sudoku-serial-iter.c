@@ -97,12 +97,10 @@ bool safe(int row, int col, int num) {
 
 int solve() {
     int ptr;
-    int N = to_solve->n;
-    int nplays = to_solve->n_plays;
 
     /* Array to keep history of previous plays (for backtracking) */
     /* One for each empty square of the initial sudoku */
-    uint8_t *plays = (uint8_t *)malloc(nplays * sizeof(uint8_t));
+    uint8_t *plays = (uint8_t *)malloc(to_solve->n_plays * sizeof(uint8_t));
 
     /* Next play to try. */
     ptr = 0;
@@ -117,7 +115,7 @@ int solve() {
         */
 
         /* Check if branch options are emptied. */
-        if (plays[ptr] > N) {
+        if (plays[ptr] > to_solve->n) {
             if (ptr == 0) {
                 /* No solution */
 
@@ -140,7 +138,7 @@ int solve() {
             plays[ptr]++; /* always to next */
 
             ptr++;
-            if (ptr < nplays) {
+            if (ptr < to_solve->n_plays) {
                 /* Branch */
 
                 plays[ptr] = 1;
