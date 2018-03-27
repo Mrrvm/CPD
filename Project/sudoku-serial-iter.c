@@ -23,7 +23,7 @@ typedef struct sudoku_struct {
     uint_fast8_t **grid;
     int_fast32_t n_plays;
     uint_fast8_t *plays;
-    square *empty_sq;
+    square **empty_sq;
 } sudoku;
 
 sudoku *to_solve;
@@ -82,7 +82,7 @@ bool valid_in_box(int row, int col, int num) {
     return true;
 }
 
-bool valid_in_col_and_row(int col, int row, int num) {
+bool valid_in_row_and_col(int row, int col, int num) {
     for (int i = 0; i < to_solve->n; i++) {
         if (to_solve->grid[i][col] == num || to_solve->grid[row][i] == num) {
             return false;
@@ -93,7 +93,33 @@ bool valid_in_col_and_row(int col, int row, int num) {
 
 // Check if it is safe to put number in position
 bool safe(int row, int col, int num) {
-    return valid_in_box(row, col, num) && valid_in_col_and_row(col, row, num);
+    return valid_in_box(row, col, num) && valid_in_row_and_col(row, col, num);
+}
+
+bool safe_by_square(square *to_test, int num) {
+    return valid_in_box(to_test->row, to_test->col, num) &&
+           valid_in_row_and_col(to_test->row, to_test->col, num);
+}
+
+void set_by_ptr(int ptr, uint_fast8_t val) {
+    to_solve->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] =
+        val;
+}
+
+square *get_square_by_ptr(int ptr) {
+    return to_solve->empty_sq[ptr];
+}
+
+uint_fast8_t get_candidate(int ptr) {
+    return to_solve->plays[ptr];
+}
+
+void set_candidate(int ptr, int val) {
+    to_solve->plays[ptr] = val;
+}
+
+void increment_candidate(int ptr) {
+    to_solve->plays[ptr]++;
 }
 
 int solve() {
@@ -126,23 +152,19 @@ int solve() {
             /* Backtrack */
             ptr--;
 
-            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
-                0;
+            set_by_ptr(ptr, 0);
             continue;
         }
 
         /* Check if next play is valid. */
-        if (safe(to_solve->empty_sq[ptr].row, to_solve->empty_sq[ptr].col,
-                 plays[ptr])) {
-            to_solve->grid[to_solve->empty_sq[ptr].row][to_solve->empty_sq[ptr].col] =
-                plays[ptr];
+        if (safe_by_square(get_square_by_ptr(ptr), get_candidate(ptr))) {
+            set_by_ptr(ptr, get_candidate(ptr));
             plays[ptr]++; /* always to next */
 
             ptr++;
             if (ptr < to_solve->n_plays) {
                 /* Branch */
-
-                plays[ptr] = 1;
+                set_candidate(ptr, 1);
             } else {
                 /* Puzzle solved */
                 free(plays);
@@ -150,7 +172,7 @@ int solve() {
             }
         } else {
             /* Try again*/
-            plays[ptr]++;
+            increment_candidate(ptr);
         }
     }
 }
@@ -184,18 +206,28 @@ int read_file(const char *filename) {
         }
     }
 
+    if (iter == 0) {
+        fclose(sudoku_file);
+        return 1;
+    }
+
     // Create aux array of empty squares
     to_solve->n_plays = iter;
-    to_solve->empty_sq = (square *)malloc(iter * sizeof(square));
+    to_solve->empty_sq = (square **)malloc(iter * sizeof(square *));
+
+    for (int i = 0; i < iter; i++) {
+        to_solve->empty_sq[i] = (square *)malloc(iter * sizeof(square));
+    }
+
     to_solve->plays = (uint8_t *)malloc(to_solve->n_plays * sizeof(uint8_t));
 
     iter = 0;
     for (int i = 0; i < to_solve->n; i++) {
         for (int j = 0; j < to_solve->n; j++) {
             if (to_solve->grid[i][j] == 0) {
-                to_solve->empty_sq[iter].row = i;
-                to_solve->empty_sq[iter].col = j;
-                to_solve->empty_sq[iter].box =
+                to_solve->empty_sq[iter]->row = i;
+                to_solve->empty_sq[iter]->col = j;
+                to_solve->empty_sq[iter]->box =
                     (i / to_solve->box_size) * to_solve->box_size +
                     j / to_solve->box_size;
 
