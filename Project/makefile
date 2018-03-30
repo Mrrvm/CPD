@@ -3,21 +3,21 @@ CFLAGS = -march=native -std=gnu11 -Wall -Wextra -Werror -g -Wpedantic -Wshadow -
 CFLAGS_RELEASE = -march=native -std=gnu11 -O2 -Os
 BINARY = kuduro
 
-all: serial serial-iter omp
+all: serial-recur serial-iter omp
 
 default: omp
 
-serial: sudoku-serial.c
-	$(CC) sudoku-serial.c $(CFLAGS) -o $(BINARY)-serial
+serial-recur: serial/sudoku-serial-recur.c
+	$(CC) serial/sudoku-serial-recur.c $(CFLAGS) -o $(BINARY)-serial-recur
 
-serial-iter: sudoku-serial-iter.c
-	$(CC) sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
+serial-iter: serial/sudoku-serial-iter.c
+	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
 
-omp: sudoku-omp.c
-	$(CC) sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-omp
+omp: omp/sudoku-omp.c
+	$(CC) omp/sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-omp
 
 clean:
 	-rm $(BINARY)*
 	-rm $(wildcard *.o)
 
-.PHONY: default all clean test serial serial-iter omp
+.PHONY: default all clean test serial-recur serial-iter omp
