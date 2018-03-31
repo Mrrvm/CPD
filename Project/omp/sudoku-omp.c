@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <omp.h>
 
 #define N_ARGS 2
 #define EMPTY 0
@@ -109,10 +110,22 @@ int set_play(node *to_play, int play) {
 
 void print_node(node *to_print) {
 
-    printf("Plays ");
+    printf("Plays [");
     for (int i = 0; i < to_print->curr_play; ++i) {
         printf("%d -> ", to_print->plays[i]);
     }
+    printf("]\n");
+}
+
+void print_queue() {
+
+    node *item;
+    item = q->head;
+    printf("Queue state\n");
+    while(item != NULL) {
+        print_node(item);
+        item = item->prev;
+    }  
     printf("\n");
 }
 
@@ -127,6 +140,7 @@ void free_sudoku() {
     }
     free(to_solve);
 }
+
 
 sudoku *init_sudoku(int box_size) {
     sudoku *new_sudoku = (sudoku *)malloc(sizeof(sudoku));
@@ -190,20 +204,99 @@ bool safe_by_square(square *to_test, int num) {
 }
 
 void set_by_ptr(int ptr, uint_fast8_t val) {
-    to_solve->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] =
-        val;
+    to_solve->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] = val;
 }
 
 square *get_square_by_ptr(int ptr) {
     return to_solve->empty_sq[ptr];
 }
 
+void cpy_plays_to_sudoku(node *item) {
+
+    for (int i = 0; i < to_solve->n_plays; ++i) {
+        set_by_ptr(i, item->plays[i]);
+    }
+    return;
+}
 
 int solve() {
     
+    int finish = 0, i = 0, tid;
+    node *new_node, *q_node;
     q = init_queue();
 
-    return 1;
+    // Initialize queue
+    #pragma omp parallel private(new_node)
+    #pragma omp for 
+    for (i = 1; i <= to_solve->n; ++i) {
+        if (safe_by_square(get_square_by_ptr(0), i)) {
+            new_node = create_node();
+            set_play(new_node, i);
+            #pragma omp critical 
+            enqueue(new_node);
+        }
+    }
+    #pragma omp barrier
+
+    print_queue();
+
+    if(q->size == 0)
+    // No solution
+        return 0;
+
+    q_node = NULL;
+
+    // Work on the queue
+    while(q->size != 0) {
+        #pragma omp parallel private(new_node, q_node, tid)
+        {
+            tid = omp_get_thread_num();
+            printf("[Thread %d]: trying to dequeue\n", tid); fflush(stdout);
+            #pragma omp critical
+            {
+                if(q->size != 0) {
+                    print_queue();
+                    q_node = dequeue();
+                }
+            }
+            
+            if(q_node != NULL) {
+                printf("[Thread %d]: dequeued\t", tid); fflush(stdout);
+                print_node(q_node); fflush(stdout);
+                if(q_node->curr_play > to_solve->n_plays) {
+                // Solution was found
+                    #pragma omp atomic
+                    finish++;
+                    cpy_plays_to_sudoku(q_node);
+                }
+
+                if(!finish) {
+                    #pragma omp for
+                    for (i = 1; i < to_solve->n; ++i) {
+                        printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
+                        if (safe_by_square(get_square_by_ptr(q_node->curr_play), i)) {
+                            new_node = create_node();
+                            memcpy(new_node->plays, q_node->plays, (q_node->curr_play)*sizeof(uint8_t));
+                            new_node->curr_play = q_node->curr_play;
+                            set_play(new_node, i);
+                            #pragma omp critical 
+                            {
+                                printf("[Thread %d]: enqueued\n", tid); fflush(stdout);
+                                enqueue(new_node);
+                            }
+                        }    
+                    }
+                    free(q_node);
+                    q_node = NULL;
+                }
+            }
+        }
+    }
+
+    if(finish) {
+        return true;
+    }
+    return false;
 }
 
 int read_file(const char *filename) {
