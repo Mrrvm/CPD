@@ -18,7 +18,6 @@ omp: omp/
 	$(CC) omp/sudoku-ompv2.c -fopenmp $(CFLAGS) -o $(BINARY)-ompv2
 
 clean:
-	-rm $(BINARY)*
-	-rm $(wildcard *.o)
+	-@rm $(BINARY)*
 
 .PHONY: default all clean test serial-recur serial-iter omp
