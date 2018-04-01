@@ -27,9 +27,10 @@ typedef struct sudoku_struct {
 } sudoku;
 
 typedef struct node_struct {
-    uint_fast8_t *plays;
-    uint_fast8_t curr_play;
+    sudoku *plays;
     struct node_struct *prev;
+    square *next_empty_sq;
+    int next_ptr;
 } node;
 
 typedef struct queue_struct {
@@ -41,15 +42,6 @@ typedef struct queue_struct {
 sudoku *to_solve;
 queue *q;
 
-node *create_node() {
-
-    node *new_node = (node*) malloc(sizeof(node));
-
-    new_node->curr_play = 0;
-    new_node->prev = NULL;
-    new_node->plays = (uint8_t *)malloc(to_solve->n_plays * sizeof(uint8_t));
-    return new_node;
-}
 
 queue *init_queue() {
 
@@ -73,16 +65,6 @@ node *dequeue() {
     return item;
 }
 
-void free_queue() {
-    
-    node *item;
-    while(q->size != 0) {
-        item = dequeue(q);
-        free(item);
-    }
-    free(q);
-}
-
 int enqueue(node *item) {
  
     if (q == NULL || item == NULL) {
@@ -101,44 +83,32 @@ int enqueue(node *item) {
     return true;
 }
 
-int set_play(node *to_play, int play) {
-
-    to_play->plays[to_play->curr_play] = play;
-    to_play->curr_play++;
-    return to_play->curr_play;
-}
-
-void print_node(node *to_print) {
-
-    printf("Plays [");
-    for (int i = 0; i < to_print->curr_play; ++i) {
-        printf("%d -> ", to_print->plays[i]);
-    }
-    printf("]\n");
-}
-
-void print_queue() {
-
-    node *item;
-    item = q->head;
-    printf("Queue state\n");
-    while(item != NULL) {
-        print_node(item);
-        item = item->prev;
-    }  
-    printf("\n");
-}
 
 void print_error(char *error) {
     fprintf(stderr, error);
     exit(EXIT_FAILURE);
 }
 
-void free_sudoku() {
+void free_sudoku(sudoku *plays) {
     for (int i = 0; i < to_solve->n; i++) {
-        free(to_solve->grid[i]);
+        free(plays->grid[i]);
     }
-    free(to_solve);
+    free(plays);
+}
+
+void free_node(node *item) {
+    free_sudoku(item->plays);
+    free(item);
+}
+
+void free_queue() {
+    
+    node *item;
+    while(q->size != 0) {
+        item = dequeue(q);
+        free_node(item);
+    }
+    free(q);
 }
 
 
@@ -162,31 +132,45 @@ sudoku *init_sudoku(int box_size) {
     return new_sudoku;
 }
 
+
+
 // Print grid
-void print_grid() {
+void print_grid(sudoku *plays) {
     for (int row = 0; row < to_solve->n; row++) {
         for (int col = 0; col < to_solve->n; col++)
-            printf("%2d ", to_solve->grid[row][col]);
+            printf("%2d ", plays->grid[row][col]);
         printf("\n");
     }
 }
 
+void print_queue() {
+
+    node *item;
+    item = q->head;
+    printf("Queue state\n");
+    while(item != NULL) {
+        print_grid(item->plays);
+        item = item->prev;
+    }  
+    printf("\n");
+}
+
 // Check box
-bool valid_in_box(int row, int col, int num) {
+bool valid_in_box(sudoku *plays, int row, int col, int num) {
     uint8_t row_start = row - row % to_solve->box_size;
     uint8_t col_start = col - col % to_solve->box_size;
 
     for (int i = 0; i < to_solve->box_size; i++)
         for (int j = 0; j < to_solve->box_size; j++)
-            if (to_solve->grid[i + row_start][j + col_start] == num) {
+            if (plays->grid[i + row_start][j + col_start] == num) {
                 return false;
             }
     return true;
 }
 
-bool valid_in_row_and_col(int row, int col, int num) {
+bool valid_in_row_and_col(sudoku *plays, int row, int col, int num) {
     for (int i = 0; i < to_solve->n; i++) {
-        if (to_solve->grid[i][col] == num || to_solve->grid[row][i] == num) {
+        if (plays->grid[i][col] == num || plays->grid[row][i] == num) {
             return false;
         }
     }
@@ -194,30 +178,59 @@ bool valid_in_row_and_col(int row, int col, int num) {
 }
 
 // Check if it is safe to put number in position
-bool safe(int row, int col, int num) {
-    return valid_in_box(row, col, num) && valid_in_row_and_col(row, col, num);
+bool safe(sudoku *plays, int row, int col, int num) {
+    return valid_in_box(plays, row, col, num) && valid_in_row_and_col(plays, row, col, num);
 }
 
-bool safe_by_square(square *to_test, int num) {
-    return valid_in_box(to_test->row, to_test->col, num) &&
-           valid_in_row_and_col(to_test->row, to_test->col, num);
+bool safe_by_square(sudoku *plays, square *to_test, int num) {
+    return valid_in_box(plays, to_test->row, to_test->col, num) &&
+           valid_in_row_and_col(plays, to_test->row, to_test->col, num);
 }
 
-void set_by_ptr(int ptr, uint_fast8_t val) {
-    to_solve->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] = val;
+void set_by_ptr(sudoku *plays, int ptr, uint_fast8_t val) {
+    plays->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] = val;
 }
 
 square *get_square_by_ptr(int ptr) {
     return to_solve->empty_sq[ptr];
 }
 
-void cpy_plays_to_sudoku(node *item) {
+node *create_node(sudoku *to_copy, int ptr) {
+
+    node *new_node = (node*) malloc(sizeof(node));
+
+    new_node->prev = NULL;
+    new_node->plays = init_sudoku(to_solve->box_size);
+
+    for(int i = 0; i<to_solve->n; i++) {
+        for(int j = 0; j<to_solve->n; j++) {
+            (new_node->plays)->grid[i][j] = to_copy->grid[i][j];
+        }
+    }
+
+    new_node->next_empty_sq = (square *)malloc(sizeof(square));
+    
+    if(ptr+1 < to_solve->n_plays) {
+        square *sq = get_square_by_ptr(ptr+1);
+        (new_node->next_empty_sq)->row = sq->row;
+        (new_node->next_empty_sq)->col = sq->col;
+        (new_node->next_empty_sq)->box = sq->box;
+    }
+        
+    new_node->next_ptr = ptr+1;
+    
+    return new_node;
+}
+
+void cpy_final_plays(sudoku *plays) {
 
     for (int i = 0; i < to_solve->n_plays; ++i) {
-        set_by_ptr(i, item->plays[i]);
+        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] = 
+            plays->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col];
     }
     return;
 }
+
 
 int solve() {
     
@@ -228,22 +241,21 @@ int solve() {
     // Initialize queue
     #pragma omp parallel private(new_node)
     #pragma omp for 
-    for (i = 1; i <= to_solve->n; ++i) {
-        if (safe_by_square(get_square_by_ptr(0), i)) {
-            new_node = create_node();
-            set_play(new_node, i);
+    for (i = 1; i <= to_solve->n; i++) {
+        if (safe_by_square(to_solve, get_square_by_ptr(0), i)) {
+            new_node = create_node(to_solve, 0);
+            set_by_ptr(new_node->plays, 0, i);
             #pragma omp critical 
             enqueue(new_node);
         }
     }
-    #pragma omp barrier
-
 
     if(q->size == 0)
     // No solution
         return 0;
 
-    print_queue();
+    //print_queue();
+
     // Work on the queue
     while(q->size != 0) {
 
@@ -251,10 +263,10 @@ int solve() {
         q_node = NULL;
         q_node = dequeue();
         
-        if(q_node->curr_play == to_solve->n_plays) {
+        if(q_node->next_ptr == to_solve->n_plays) {
         // Solution was found
             finish++;
-            cpy_plays_to_sudoku(q_node);
+            cpy_final_plays(q_node->plays);
         }
 
         #pragma omp parallel private(new_node/*, tid*/)
@@ -264,12 +276,9 @@ int solve() {
                 #pragma omp for
                 for (i = 1; i <= to_solve->n; i++) {
                     //printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
-                    if (safe_by_square(get_square_by_ptr(q_node->curr_play), i)) {
-                        new_node = create_node();
-                        memcpy(new_node->plays, q_node->plays, (q_node->curr_play)*sizeof(uint8_t));
-                        new_node->curr_play = q_node->curr_play;
-                        set_play(new_node, i);
-                        
+                    if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
+                        new_node = create_node(q_node->plays, q_node->next_ptr);
+                        set_by_ptr(new_node->plays, q_node->next_ptr, i);
                         #pragma omp critical 
                         {
                             //printf("[Thread %d]: enqueued - %d\n", tid, q->size); fflush(stdout);
@@ -279,7 +288,7 @@ int solve() {
                     }          
                 }
                 #pragma omp single
-                free(q_node);
+                free_node(q_node);
             }
         }
     }
@@ -367,14 +376,14 @@ int main(int argc, char const *argv[]) {
         print_error(error);
     }
 
-    print_grid();
+    print_grid(to_solve);
     printf("\n");
 
     begin = clock();
     // Solve the puzzle
     if (solve()) {
         end = clock();
-        print_grid();
+        print_grid(to_solve);
         printf("Solved Sudoku\n");
         // Solution found
     } else {

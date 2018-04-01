@@ -13,8 +13,9 @@ serial-recur: serial/sudoku-serial-recur.c
 serial-iter: serial/sudoku-serial-iter.c
 	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
 
-omp: omp/sudoku-omp.c
-	$(CC) omp/sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-omp
+omp: omp/
+	$(CC) omp/sudoku-ompv1.c -fopenmp $(CFLAGS) -o $(BINARY)-ompv1
+	$(CC) omp/sudoku-ompv2.c -fopenmp $(CFLAGS) -o $(BINARY)-ompv2
 
 clean:
 	-rm $(BINARY)*
