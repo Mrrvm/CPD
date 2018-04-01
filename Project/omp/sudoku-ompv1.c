@@ -1,4 +1,20 @@
-// Sudoku Solver
+/* Version 1
+ * ----------------
+ * BFS search w/ single processor managing
+ * The queue is composed of items, each one having a puzzle grid.
+ * A single processor takes one item of the queue and distributes it by N threads
+ * If the thread see the play as valid, inserts a new item with it in queue
+ * Slower than serial. 
+ *
+ * Benchmarks
+ * 4x4: ~0.005s
+ * 9x9: ~185s
+ *
+ * Notes
+ * Using 5 cores.
+*/
+
+
 #include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -338,7 +354,7 @@ int read_file(const char *filename) {
     to_solve->empty_sq = (square **)malloc(iter * sizeof(square *));
 
     for (int i = 0; i < iter; i++) {
-        to_solve->empty_sq[i] = (square *)malloc(iter * sizeof(square));
+        to_solve->empty_sq[i] = (square *)malloc(sizeof(square));
     }
 
     iter = 0;
