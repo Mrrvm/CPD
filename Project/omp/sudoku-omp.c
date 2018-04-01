@@ -238,59 +238,51 @@ int solve() {
     }
     #pragma omp barrier
 
-    print_queue();
 
     if(q->size == 0)
     // No solution
         return 0;
 
-    q_node = NULL;
-
+    print_queue();
     // Work on the queue
     while(q->size != 0) {
-        #pragma omp parallel private(new_node, q_node, tid)
+
+        // Get one node from queue
+        q_node = NULL;
+        q_node = dequeue();
+        
+        if(q_node->curr_play == to_solve->n_plays) {
+        // Solution was found
+            finish++;
+            cpy_plays_to_sudoku(q_node);
+        }
+
+        #pragma omp parallel private(new_node, tid)
         {
             tid = omp_get_thread_num();
-            printf("[Thread %d]: trying to dequeue\n", tid); fflush(stdout);
-            #pragma omp critical
-            {
-                if(q->size != 0) {
-                    print_queue();
-                    q_node = dequeue();
-                }
-            }
-            
-            if(q_node != NULL) {
-                printf("[Thread %d]: dequeued\t", tid); fflush(stdout);
-                print_node(q_node); fflush(stdout);
-                if(q_node->curr_play > to_solve->n_plays) {
-                // Solution was found
-                    #pragma omp atomic
-                    finish++;
-                    cpy_plays_to_sudoku(q_node);
-                }
+            if(!finish) {
+                #pragma omp for
+                for (i = 1; i <= to_solve->n; i++) {
+                    printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
+                    if (safe_by_square(get_square_by_ptr(q_node->curr_play), i)) {
+                        new_node = create_node();
+                        memcpy(new_node->plays, q_node->plays, (q_node->curr_play)*sizeof(uint8_t));
+                        new_node->curr_play = q_node->curr_play;
+                        set_play(new_node, i);
+                        
+                        #pragma omp critical 
+                        {
+                            printf("[Thread %d]: enqueued - %d\n", tid, q->size); fflush(stdout);
+                            enqueue(new_node);
 
-                if(!finish) {
-                    #pragma omp for
-                    for (i = 1; i < to_solve->n; ++i) {
-                        printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
-                        if (safe_by_square(get_square_by_ptr(q_node->curr_play), i)) {
-                            new_node = create_node();
-                            memcpy(new_node->plays, q_node->plays, (q_node->curr_play)*sizeof(uint8_t));
-                            new_node->curr_play = q_node->curr_play;
-                            set_play(new_node, i);
-                            #pragma omp critical 
-                            {
-                                printf("[Thread %d]: enqueued\n", tid); fflush(stdout);
-                                enqueue(new_node);
-                            }
-                        }    
-                    }
-                    free(q_node);
-                    q_node = NULL;
+                        }
+                    }          
                 }
+                #pragma omp single
+                free(q_node);
             }
         }
+        printf("queue size %d\n", q->size);
     }
 
     if(finish) {
