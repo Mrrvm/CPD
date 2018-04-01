@@ -35,7 +35,7 @@ typedef struct node_struct {
 typedef struct queue_struct {
     node *head;
     node *tail;
-    uint_fast8_t size;
+    int size;
 } queue;
 
 sudoku *to_solve;
@@ -221,7 +221,7 @@ void cpy_plays_to_sudoku(node *item) {
 
 int solve() {
     
-    int finish = 0, i = 0, tid;
+    int finish = 0, i = 0/*, tid*/;
     node *new_node, *q_node;
     q = init_queue();
 
@@ -257,13 +257,13 @@ int solve() {
             cpy_plays_to_sudoku(q_node);
         }
 
-        #pragma omp parallel private(new_node, tid)
+        #pragma omp parallel private(new_node/*, tid*/)
         {
-            tid = omp_get_thread_num();
+            //tid = omp_get_thread_num();
             if(!finish) {
                 #pragma omp for
                 for (i = 1; i <= to_solve->n; i++) {
-                    printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
+                    //printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
                     if (safe_by_square(get_square_by_ptr(q_node->curr_play), i)) {
                         new_node = create_node();
                         memcpy(new_node->plays, q_node->plays, (q_node->curr_play)*sizeof(uint8_t));
@@ -272,7 +272,7 @@ int solve() {
                         
                         #pragma omp critical 
                         {
-                            printf("[Thread %d]: enqueued - %d\n", tid, q->size); fflush(stdout);
+                            //printf("[Thread %d]: enqueued - %d\n", tid, q->size); fflush(stdout);
                             enqueue(new_node);
 
                         }
@@ -282,7 +282,6 @@ int solve() {
                 free(q_node);
             }
         }
-        printf("queue size %d\n", q->size);
     }
 
     if(finish) {
