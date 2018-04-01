@@ -28,35 +28,35 @@ int solve() {
     int ptr_private;
 
     while (1) {
-      /*** Public part (critical region) ***/
-      while (1) {
+        /*** Public part (critical region) ***/
         while (1) {
-            /*** Iterative algorithm as if plays is from 0 to n_shared-1 ***/
-            /*** Using public sudoku map and public_ptr ***/
+            while (1) {
+                /*** Iterative algorithm as if plays is from 0 to n_shared-1 ***/
+                /*** Using public sudoku map and public_ptr ***/
 
-            /*** If no more public plays exit this and set "ended = 1" ***/
+                /*** If no more public plays exit this and set "ended = 1" ***/
+            }
+
+            /*** Make private copy of map. Just iterate through public plays
+                 and change those in private map without checking validity
+                 (Other option is copying public plays and making this in private)
+            ***/
         }
+        /*** End public part (public_ptr == n_shared-1) ***/
 
-        /*** Make private copy of map. Just iterate through public plays
-             and change those in private map without checking validity
-             (Other option is copying public plays and making this in private)
-        ***/
-      }
-      /*** End public part (public_ptr == n_shared-1) ***/
+        if (ended = 1)
+            break;
 
-      if (ended = 1) break;
+        ptr_private = n_shared;
 
-      ptr_private = n_shared;
+        while (1) {
+            /*** Iterative algorithm as if plays is from n_shared to n_plays ***/
+            /*** Using private sudoku map ***/
 
-      while (1) {
-        /*** Iterative algorithm as if plays is from n_shared to n_plays ***/
-        /*** Using private sudoku map ***/
-
-        /*** If reached end, warn all threads and exit ***/
-        /*** If not, just continue while ***/
-      }
-      /** If reached here, no solution was found and ptr_private == n_shared ***/
-
+            /*** If reached end, warn all threads and exit ***/
+            /*** If not, just continue while ***/
+        }
+        /** If reached here, no solution was found and ptr_private == n_shared ***/
     }
 
     /*** Join threads (barrier) ***/
