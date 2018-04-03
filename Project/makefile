@@ -14,8 +14,10 @@ serial-iter: serial/sudoku-serial-iter.c
 	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
 
 omp: omp/
-	$(CC) omp/sudoku-ompv1.c -fopenmp $(CFLAGS) -o $(BINARY)-ompv1
-	$(CC) omp/sudoku-ompv2.c -fopenmp $(CFLAGS) -o $(BINARY)-ompv2
+	$(CC) omp/sudoku-omp_dfsv1.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv1
+	$(CC) omp/sudoku-omp_dfsv2.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv2
+	$(CC) omp/sudoku-omp_dfsv3.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv3
+	$(CC) omp/sudoku-omp_subqueues.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_subqueries
 
 clean:
 	-@rm $(BINARY)*

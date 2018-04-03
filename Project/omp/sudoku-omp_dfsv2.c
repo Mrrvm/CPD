@@ -8,12 +8,14 @@
  *
  * Benchmarks
  * 4x4: 0.002s
- * 9x9: 82s
+ * 9x9: 74s
  *
  * Tests
  * Tried a filled squares vector, to speedup the grid copy in node creation,
  * Tried parallelizing the copy
- * turns out its slower 
+ * 
+ * Updates
+ * Te second for is now, nowait
  *
  * Notes
  * Using 5 cores.
@@ -244,20 +246,22 @@ void cpy_final_plays(sudoku *plays) {
 
 
 int solve() {
-    
+        
     int finish = 0, i = 0/*, tid*/;
-    node *new_node, *q_node;
     q = init_queue();
 
     // Initialize queue
-    #pragma omp parallel private(new_node)
-    #pragma omp for 
-    for (i = 1; i <= to_solve->n; i++) {
-        if (safe_by_square(to_solve, get_square_by_ptr(0), i)) {
-            new_node = create_node(to_solve, 0);
-            set_by_ptr(new_node->plays, 0, i);
-            #pragma omp critical 
-            enqueue(new_node);
+    #pragma omp parallel 
+    {
+        #pragma omp for nowait
+        for (i = 1; i <= to_solve->n; i++) {
+            if (safe_by_square(to_solve, get_square_by_ptr(0), i)) {
+                node *new_node;
+                new_node = create_node(to_solve, 0);
+                set_by_ptr(new_node->plays, 0, i);
+                #pragma omp critical 
+                enqueue(new_node);
+            }
         }
     }
 
@@ -270,9 +274,9 @@ int solve() {
     // Work on the queue
     while(q->size != 0) {
 
-        #pragma omp parallel private(q_node/*, tid*/) 
+        #pragma omp parallel 
         {
-            q_node = NULL;
+            node *q_node = NULL;
             // Get one node from queue
             #pragma omp critical 
             {
@@ -286,14 +290,15 @@ int solve() {
                     cpy_final_plays(q_node->plays);
                 }
 
-                #pragma omp parallel private(new_node/*, tid*/)
+                #pragma omp parallel 
                 {
                     //tid = omp_get_thread_num();
                     if(!finish) {
-                        #pragma omp for
+                        #pragma omp for nowait
                         for (i = 1; i <= to_solve->n; i++) {
                             //printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
                             if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
+                                node *new_node;
                                 new_node = create_node(q_node->plays, q_node->next_ptr);
                                 set_by_ptr(new_node->plays, q_node->next_ptr, i);
                                 #pragma omp critical 
@@ -304,7 +309,7 @@ int solve() {
                                 }
                             }          
                         }
-                        #pragma omp single
+                        #pragma omp single nowait
                         free_node(q_node);
                     }
                 }
@@ -317,6 +322,7 @@ int solve() {
         return true;
     }
     return false;
+
 }
 
 int read_file(const char *filename) {
