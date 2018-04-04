@@ -33,284 +33,125 @@
 #define EMPTY 0
 
 typedef struct square_struct {
-    int_fast32_t row;
-    int_fast32_t col;
-    int_fast32_t box;
+    int_fast8_t row;
+    int_fast8_t col;
+    int_fast8_t box;
 } square;
 
-typedef struct sudoku_struct {
+typedef uint_fast8_t **sudoku;
+
+// Mother of all sudokus
+typedef struct moas_t {
+    square **empty_sq;
+    sudoku to_solve;
     int_fast32_t n;
     int_fast32_t box_size;
-    uint_fast8_t **grid;
-    int_fast32_t n_plays;
-    square **empty_sq;
-} sudoku;
+    int_fast32_t n_empty_sq;
+} moas;
 
-typedef struct node_struct {
-    sudoku *plays;
-    struct node_struct *prev;
-    int next_ptr;
-} node;
-
-typedef struct queue_struct {
-    node *head;
-    node *tail;
-    int size;
-} queue;
-
-sudoku *to_solve;
-queue *q;
-
-queue *init_queue() {
-    queue *new_queue = (queue *)malloc(sizeof(queue));
-
-    new_queue->size = 0;
-    new_queue->head = NULL;
-    new_queue->tail = NULL;
-
-    return new_queue;
-}
-
-node *dequeue() {
-    node *item;
-    if (q->size == 0)
-        return NULL;
-    item = q->head;
-    q->head = (q->head)->prev;
-    q->size--;
-    return item;
-}
-
-int enqueue(node *item) {
-    if (q == NULL || item == NULL) {
-        return false;
-    }
-
-    if (q->size == 0) {
-        q->head = item;
-        q->tail = item;
-
-    } else {
-        q->tail->prev = item;
-        q->tail = item;
-    }
-    q->size++;
-    return true;
-}
+int gDONE;
+moas *gMOAS;
 
 void print_error(char *error) {
     fprintf(stderr, error);
     exit(EXIT_FAILURE);
 }
 
-void free_sudoku(sudoku *to_free) {
-    for (int i = 0; i < to_free->n; i++) {
-        free(to_free->grid[i]);
+// Free sudoku typedef
+void free_sudoku(sudoku to_free) {
+    for (int i = 0; i < gMOAS->n; i++) {
+        free(to_free[i]);
     }
-    for (int i = 0; i < to_free->n_plays; ++i) {
-        free(to_free->empty_sq[i]);
-    }
-    free(to_free->grid);
-    free(to_free->empty_sq);
     free(to_free);
 }
 
-void free_node(node *item) {
-    free_sudoku(item->plays);
-    free(item);
-}
-
-void free_queue() {
-    node *item;
-    while (q->size != 0) {
-        item = dequeue(q);
-        free_node(item);
+// Free global MOAS
+void free_gMOAS() {
+    free_sudoku(gMOAS->to_solve);
+    for (int i = 0; i < gMOAS->n_empty_sq; ++i) {
+        free(gMOAS->empty_sq[i]);
     }
-    free(q);
-}
 
-sudoku *init_sudoku(int box_size) {
-    sudoku *new_sudoku = (sudoku *)malloc(sizeof(sudoku));
-
-    new_sudoku->box_size = box_size;
-    new_sudoku->n = box_size * box_size;
-    new_sudoku->n_plays = 0;
-    new_sudoku->empty_sq = NULL;
-
-    // Allocate matrix
-    new_sudoku->grid = (uint8_t **)malloc(new_sudoku->n * sizeof(uint8_t *));
-    if (new_sudoku->grid == NULL)
-        print_error("Could not allocate space\n");
-    for (int i = 0; i < new_sudoku->n; i++) {
-        new_sudoku->grid[i] = (uint8_t *)malloc(new_sudoku->n * sizeof(uint8_t));
-        if (new_sudoku->grid[i] == NULL)
-            print_error("Could not allocate space\n");
-    }
-    return new_sudoku;
+    free(gMOAS->empty_sq);
+    free(gMOAS);
 }
 
 // Print grid
-void print_grid(sudoku *plays) {
-    for (int row = 0; row < to_solve->n; row++) {
-        for (int col = 0; col < to_solve->n; col++)
-            printf("%2d ", plays->grid[row][col]);
+void print_grid(sudoku to_print) {
+    for (int row = 0; row < gMOAS->n; row++) {
+        for (int col = 0; col < gMOAS->n; col++) {
+            printf("%2d ", to_print[row][col]);
+        }
         printf("\n");
     }
 }
 
-void print_queue() {
-    node *item;
-    item = q->head;
-    printf("Queue state\n");
-    while (item != NULL) {
-        print_grid(item->plays);
-        item = item->prev;
-    }
-    printf("\n");
-}
+// Check box, row and column for safety
+bool safe(sudoku to_check, square *to_test, int num) {
+    uint_fast8_t row_start = to_test->row - to_test->row % gMOAS->box_size;
+    uint_fast8_t col_start = to_test->col - to_test->col % gMOAS->box_size;
 
-// Check box
-bool valid_in_box(sudoku *plays, int row, int col, int num) {
-    uint8_t row_start = row - row % to_solve->box_size;
-    uint8_t col_start = col - col % to_solve->box_size;
-
-    for (int i = 0; i < to_solve->box_size; i++)
-        for (int j = 0; j < to_solve->box_size; j++)
-            if (plays->grid[i + row_start][j + col_start] == num) {
-                return false;
-            }
-    return true;
-}
-
-bool valid_in_row_and_col(sudoku *plays, int row, int col, int num) {
-    for (int i = 0; i < to_solve->n; i++) {
-        if (plays->grid[i][col] == num || plays->grid[row][i] == num) {
+    for (int i = 0; i < gMOAS->n; i++) {
+        if (to_check[i][to_test->col] == num || to_check[to_test->row][i] == num) {
             return false;
         }
     }
+
+    for (int i = 0; i < gMOAS->box_size; i++)
+        for (int j = 0; j < gMOAS->box_size; j++)
+            if (to_check[i + row_start][j + col_start] == num) {
+                return false;
+            }
+
     return true;
 }
 
-// Check if it is safe to put number in position
-bool safe(sudoku *plays, int row, int col, int num) {
-    return valid_in_box(plays, row, col, num) &&
-           valid_in_row_and_col(plays, row, col, num);
+void copy_to_gMOAS(sudoku solved) {
+    for (int i = 0; i < gMOAS->n_empty_sq; i++) {
+        gMOAS->to_solve[gMOAS->empty_sq[i]->row][gMOAS->empty_sq[i]->col] =
+            solved[gMOAS->empty_sq[i]->row][gMOAS->empty_sq[i]->col];
+    }
 }
 
-bool safe_by_square(sudoku *plays, square *to_test, int num) {
-    return valid_in_box(plays, to_test->row, to_test->col, num) &&
-           valid_in_row_and_col(plays, to_test->row, to_test->col, num);
+sudoku new_state_copy(sudoku old_state) {
+    sudoku new_state = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
+    for (int i = 0; i < gMOAS->n; i++) {
+        new_state[i] = (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
+        memcpy(new_state[i], old_state[i], gMOAS->n * sizeof(uint_fast8_t));
+    }
+    return new_state;
 }
 
-void set_by_ptr(sudoku *plays, int ptr, uint_fast8_t val) {
-    plays->grid[to_solve->empty_sq[ptr]->row][to_solve->empty_sq[ptr]->col] = val;
-}
+void solve(int id, sudoku state) {
+    if (gDONE) {
+        return;
+    }
 
-square *get_square_by_ptr(int ptr) {
-    return to_solve->empty_sq[ptr];
-}
-
-node *create_node(sudoku *to_copy, int ptr) {
-
-    node *new_node = (node *)malloc(sizeof(node));
-
-    new_node->prev = NULL;
-    new_node->plays = init_sudoku(to_solve->box_size);
-
-    for (int i = 0; i < to_solve->n; i++) {
-        for (int j = 0; j < to_solve->n; j++) {
-            (new_node->plays)->grid[i][j] = to_copy->grid[i][j];
+    /* if in the last solve layer check if solved and start popping */
+    if (id == gMOAS->n_empty_sq - 1) {
+        for (int i = 1; i <= gMOAS->n; i++) {
+            if (safe(state, gMOAS->empty_sq[id], i)) {
+                copy_to_gMOAS(state);
+                gDONE++;
+                return;
+            }
         }
+        return;
     }
 
-    new_node->next_ptr = ptr + 1;
-
-    return new_node;
-}
-
-void cpy_final_plays(sudoku *plays) {
-    for (int i = 0; i < to_solve->n_plays; ++i) {
-        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] =
-            plays->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col];
-    }
-}
-
-int solve() {
-    int finish = 0, i = 0, j = 0 /*, tid*/;
-    q = init_queue(); // Initialize queue
-
-    #pragma omp parallel
-    {
-        #pragma omp for nowait
-        for (i = 1; i <= to_solve->n; i++) {
-            if (safe_by_square(to_solve, get_square_by_ptr(0), i)) {
-                node *new_node;
-                new_node = create_node(to_solve, 0);
-                set_by_ptr(new_node->plays, 0, i);
-                #pragma omp critical
-                enqueue(new_node);
+    /* try each son solution */
+    for (int i = 1; i <= gMOAS->n; i++) {
+        #pragma omp task untied
+        {
+            if (safe(state, gMOAS->empty_sq[id], i)) {
+                sudoku new_state = new_state_copy(state);
+                solve(id++, new_state);
             }
         }
     }
 
-    if (q->size == 0) // No solution
-        return 0;
-    // print_queue();
-
-    #pragma omp parallel
-    {   // Work on the queue
-        #pragma omp for nowait
-        for (j = 0; j <= q->size; ++j) {
-            // Must check the q->size from time to time
-            // Meaning, if a thread's subqueue exists and the man queue is getting
-            // smaller, flush it.
-            node *q_node = NULL;
-            #pragma omp critical
-            {   // Get one node from queue
-                q_node = dequeue();
-            }
-
-            if (q_node != NULL) {
-                if (q_node->next_ptr == to_solve->n_plays) {
-                    #pragma omp atomic
-                    finish++; // Solution was found
-                    cpy_final_plays(q_node->plays);
-                }
-
-                #pragma omp parallel
-                {
-                    // tid = omp_get_thread_num();
-                    if (!finish) {
-                        #pragma omp for nowait
-                        for (i = 1; i <= to_solve->n; i++) {
-                            // printf("[Thread %d]: trying %d on play %d\n", tid, i,
-                            // q_node->curr_play); fflush(stdout);
-                            if (safe_by_square(q_node->plays,
-                                               get_square_by_ptr(q_node->next_ptr), i)) {
-                                node *new_node;
-                                new_node = create_node(q_node->plays, q_node->next_ptr);
-                                set_by_ptr(new_node->plays, q_node->next_ptr, i);
-                                #pragma omp critical
-                                {
-                                    // printf("[Thread %d]: enqueued - %d\n", tid, q->size);
-                                    // fflush(stdout);
-                                    enqueue(new_node);
-                                    j--;
-                                }
-                            }
-                        }
-                        #pragma omp single nowait
-                        free_node(q_node);
-                    }
-                }
-            }
-        }
-    }
-
-    if (finish) {
-        return true;
-    }
-    return false;
+    free_sudoku(state);
+    #pragma omp taskwait
 }
 
 int read_file(const char *filename) {
@@ -319,23 +160,36 @@ int read_file(const char *filename) {
     int iter;
     uint8_t num;
 
-    // Opens file
+    /* Opens file */
     sudoku_file = fopen(filename, "r");
     if (sudoku_file == NULL)
         print_error("Could not open file\n");
 
-    // Scans first line (aka the square size)
+    /* Scans first line (aka the square size) */
     if (fscanf(sudoku_file, "%d", &box_size) == EOF)
         print_error("Could not read file\n");
-    to_solve = init_sudoku(box_size);
 
-    // Read the file
+    gMOAS = (moas *)malloc(sizeof(moas));
+    if (gMOAS == NULL) {
+        print_error("Unable to init MOAS");
+    }
+
+    gMOAS->box_size = box_size;
+    gMOAS->n = box_size * box_size;
+
+    gMOAS->to_solve = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
+    for (int i = 0; i < gMOAS->n; i++) {
+        gMOAS->to_solve[i] =
+            (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
+    }
+
+    /* Read the file */
     iter = 0;
-    for (int i = 0; i < to_solve->n; i++) {
-        for (int j = 0; j < to_solve->n; j++) {
+    for (int i = 0; i < gMOAS->n; i++) {
+        for (int j = 0; j < gMOAS->n; j++) {
             fscanf(sudoku_file, "%2" SCNu8, &num);
 
-            to_solve->grid[i][j] = num;
+            gMOAS->to_solve[i][j] = num;
             if (num == 0) {
                 iter++;
             }
@@ -348,22 +202,21 @@ int read_file(const char *filename) {
     }
 
     // Create aux array of empty squares
-    to_solve->n_plays = iter;
-    to_solve->empty_sq = (square **)malloc(iter * sizeof(square *));
+    gMOAS->n_empty_sq = iter;
+    gMOAS->empty_sq = (square **)malloc(iter * sizeof(square *));
 
     for (int i = 0; i < iter; i++) {
-        to_solve->empty_sq[i] = (square *)malloc(sizeof(square));
+        gMOAS->empty_sq[i] = (square *)malloc(sizeof(square));
     }
 
     iter = 0;
-    for (int i = 0; i < to_solve->n; i++) {
-        for (int j = 0; j < to_solve->n; j++) {
-            if (to_solve->grid[i][j] == 0) {
-                to_solve->empty_sq[iter]->row = i;
-                to_solve->empty_sq[iter]->col = j;
-                to_solve->empty_sq[iter]->box =
-                    (i / to_solve->box_size) * to_solve->box_size +
-                    j / to_solve->box_size;
+    for (int i = 0; i < gMOAS->n; i++) {
+        for (int j = 0; j < gMOAS->n; j++) {
+            if (gMOAS->to_solve[i][j] == 0) {
+                gMOAS->empty_sq[iter]->row = i;
+                gMOAS->empty_sq[iter]->col = j;
+                gMOAS->empty_sq[iter]->box =
+                    (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
 
                 iter++;
             }
@@ -375,7 +228,6 @@ int read_file(const char *filename) {
 }
 
 int main(int argc, char const *argv[]) {
-
     clock_t begin, end;
 
     if (argc != N_ARGS) {
@@ -390,14 +242,16 @@ int main(int argc, char const *argv[]) {
         print_error(error);
     }
 
-    print_grid(to_solve);
+    print_grid(gMOAS->to_solve);
     printf("\n");
 
     begin = clock();
     // Solve the puzzle
-    if (solve()) {
+    sudoku new_state = new_state_copy(gMOAS->to_solve);
+    solve(0, new_state);
+    if (gDONE != 0) {
         end = clock();
-        print_grid(to_solve);
+        print_grid(gMOAS->to_solve);
         printf("Solved Sudoku\n");
         // Solution found
     } else {
@@ -406,7 +260,7 @@ int main(int argc, char const *argv[]) {
         // No solution
     };
 
-    free_sudoku(to_solve);
+    free_gMOAS();
     printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
     return 0;
 }
