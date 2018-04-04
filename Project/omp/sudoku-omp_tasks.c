@@ -61,7 +61,7 @@ void print_error(char *error) {
 int read_file(const char *filename) {
     FILE *sudoku_file;
     int box_size;
-    int iter;
+    uint_fast32_t iter;
     uint8_t num;
 
     /* Opens file */
@@ -109,7 +109,7 @@ int read_file(const char *filename) {
     gMOAS->n_empty_sq = iter;
     gMOAS->empty_sq = (square **)malloc(iter * sizeof(square *));
 
-    for (int i = 0; i < iter; i++) {
+    for (uint_fast32_t i = 0; i < iter; i++) {
         gMOAS->empty_sq[i] = (square *)malloc(sizeof(square));
     }
 
