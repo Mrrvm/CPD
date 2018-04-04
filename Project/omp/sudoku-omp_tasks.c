@@ -1,6 +1,5 @@
-/* Version 3
+/* Tasks
  * ----------------
- * BFS search w/ multiple processors managing
  * The queue is composed of items, each one having a puzzle grid.
  * Each processor takes one item of the queue and distributes it by N threads
  * If the thread see the play as valid, inserts a new item with it in queue
@@ -63,7 +62,6 @@ sudoku *to_solve;
 queue *q;
 
 queue *init_queue() {
-
     queue *new_queue = (queue *)malloc(sizeof(queue));
 
     new_queue->size = 0;
@@ -74,7 +72,6 @@ queue *init_queue() {
 }
 
 node *dequeue() {
-
     node *item;
     if (q->size == 0)
         return NULL;
@@ -85,7 +82,6 @@ node *dequeue() {
 }
 
 int enqueue(node *item) {
-
     if (q == NULL || item == NULL) {
         return false;
     }
@@ -107,11 +103,16 @@ void print_error(char *error) {
     exit(EXIT_FAILURE);
 }
 
-void free_sudoku(sudoku *plays) {
-    for (int i = 0; i < to_solve->n; i++) {
-        free(plays->grid[i]);
+void free_sudoku(sudoku *to_free) {
+    for (int i = 0; i < to_free->n; i++) {
+        free(to_free->grid[i]);
     }
-    free(plays);
+    for (int i = 0; i < to_free->n_plays; ++i) {
+        free(to_free->empty_sq[i]);
+    }
+    free(to_free->grid);
+    free(to_free->empty_sq);
+    free(to_free);
 }
 
 void free_node(node *item) {
@@ -120,7 +121,6 @@ void free_node(node *item) {
 }
 
 void free_queue() {
-
     node *item;
     while (q->size != 0) {
         item = dequeue(q);
@@ -159,7 +159,6 @@ void print_grid(sudoku *plays) {
 }
 
 void print_queue() {
-
     node *item;
     item = q->head;
     printf("Queue state\n");
@@ -230,20 +229,16 @@ node *create_node(sudoku *to_copy, int ptr) {
 }
 
 void cpy_final_plays(sudoku *plays) {
-
     for (int i = 0; i < to_solve->n_plays; ++i) {
         to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] =
             plays->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col];
     }
-    return;
 }
 
 int solve() {
-
     int finish = 0, i = 0, j = 0 /*, tid*/;
-    q = init_queue();
+    q = init_queue(); // Initialize queue
 
-    // Initialize queue
     #pragma omp parallel
     {
         #pragma omp for nowait
@@ -258,32 +253,27 @@ int solve() {
         }
     }
 
-    if (q->size == 0)
-        // No solution
+    if (q->size == 0) // No solution
         return 0;
-
     // print_queue();
 
-    // Work on the queue
     #pragma omp parallel
-    {
+    {   // Work on the queue
         #pragma omp for nowait
         for (j = 0; j <= q->size; ++j) {
             // Must check the q->size from time to time
             // Meaning, if a thread's subqueue exists and the man queue is getting
             // smaller, flush it.
             node *q_node = NULL;
-            // Get one node from queue
             #pragma omp critical
-            {
+            {   // Get one node from queue
                 q_node = dequeue();
             }
 
             if (q_node != NULL) {
                 if (q_node->next_ptr == to_solve->n_plays) {
-// Solution was found
                     #pragma omp atomic
-                    finish++;
+                    finish++; // Solution was found
                     cpy_final_plays(q_node->plays);
                 }
 
