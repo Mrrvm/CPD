@@ -57,6 +57,79 @@ void print_error(char *error) {
     exit(EXIT_FAILURE);
 }
 
+int read_file(const char *filename) {
+    FILE *sudoku_file;
+    int box_size;
+    int iter;
+    uint8_t num;
+
+    /* Opens file */
+    sudoku_file = fopen(filename, "r");
+    if (sudoku_file == NULL)
+        print_error("Could not open file\n");
+
+    /* Scans first line (aka the square size) */
+    if (fscanf(sudoku_file, "%d", &box_size) == EOF)
+        print_error("Could not read file\n");
+
+    gMOAS = (moas *)malloc(sizeof(moas));
+    if (gMOAS == NULL) {
+        print_error("Unable to init MOAS");
+    }
+
+    gMOAS->box_size = box_size;
+    gMOAS->n = box_size * box_size;
+
+    gMOAS->to_solve = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
+    for (int i = 0; i < gMOAS->n; i++) {
+        gMOAS->to_solve[i] =
+            (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
+    }
+
+    /* Read the file */
+    iter = 0;
+    for (int i = 0; i < gMOAS->n; i++) {
+        for (int j = 0; j < gMOAS->n; j++) {
+            fscanf(sudoku_file, "%2" SCNu8, &num);
+
+            gMOAS->to_solve[i][j] = num;
+            if (num == 0) {
+                iter++;
+            }
+        }
+    }
+
+    if (iter == 0) {
+        fclose(sudoku_file);
+        return 1;
+    }
+
+    // Create aux array of empty squares
+    gMOAS->n_empty_sq = iter;
+    gMOAS->empty_sq = (square **)malloc(iter * sizeof(square *));
+
+    for (int i = 0; i < iter; i++) {
+        gMOAS->empty_sq[i] = (square *)malloc(sizeof(square));
+    }
+
+    iter = 0;
+    for (int i = 0; i < gMOAS->n; i++) {
+        for (int j = 0; j < gMOAS->n; j++) {
+            if (gMOAS->to_solve[i][j] == 0) {
+                gMOAS->empty_sq[iter]->row = i;
+                gMOAS->empty_sq[iter]->col = j;
+                gMOAS->empty_sq[iter]->box =
+                    (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
+
+                iter++;
+            }
+        }
+    }
+
+    fclose(sudoku_file);
+    return 0;
+}
+
 // Free sudoku typedef
 void free_sudoku(sudoku to_free) {
     for (int i = 0; i < gMOAS->n; i++) {
@@ -156,79 +229,6 @@ void solve(int id, sudoku state) {
 
     free_sudoku(state);
     /* #pragma omp taskwait */
-}
-
-int read_file(const char *filename) {
-    FILE *sudoku_file;
-    int box_size;
-    int iter;
-    uint8_t num;
-
-    /* Opens file */
-    sudoku_file = fopen(filename, "r");
-    if (sudoku_file == NULL)
-        print_error("Could not open file\n");
-
-    /* Scans first line (aka the square size) */
-    if (fscanf(sudoku_file, "%d", &box_size) == EOF)
-        print_error("Could not read file\n");
-
-    gMOAS = (moas *)malloc(sizeof(moas));
-    if (gMOAS == NULL) {
-        print_error("Unable to init MOAS");
-    }
-
-    gMOAS->box_size = box_size;
-    gMOAS->n = box_size * box_size;
-
-    gMOAS->to_solve = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
-    for (int i = 0; i < gMOAS->n; i++) {
-        gMOAS->to_solve[i] =
-            (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
-    }
-
-    /* Read the file */
-    iter = 0;
-    for (int i = 0; i < gMOAS->n; i++) {
-        for (int j = 0; j < gMOAS->n; j++) {
-            fscanf(sudoku_file, "%2" SCNu8, &num);
-
-            gMOAS->to_solve[i][j] = num;
-            if (num == 0) {
-                iter++;
-            }
-        }
-    }
-
-    if (iter == 0) {
-        fclose(sudoku_file);
-        return 1;
-    }
-
-    // Create aux array of empty squares
-    gMOAS->n_empty_sq = iter;
-    gMOAS->empty_sq = (square **)malloc(iter * sizeof(square *));
-
-    for (int i = 0; i < iter; i++) {
-        gMOAS->empty_sq[i] = (square *)malloc(sizeof(square));
-    }
-
-    iter = 0;
-    for (int i = 0; i < gMOAS->n; i++) {
-        for (int j = 0; j < gMOAS->n; j++) {
-            if (gMOAS->to_solve[i][j] == 0) {
-                gMOAS->empty_sq[iter]->row = i;
-                gMOAS->empty_sq[iter]->col = j;
-                gMOAS->empty_sq[iter]->box =
-                    (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
-
-                iter++;
-            }
-        }
-    }
-
-    fclose(sudoku_file);
-    return 0;
 }
 
 int main(int argc, char const *argv[]) {
