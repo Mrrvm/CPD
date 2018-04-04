@@ -13,11 +13,14 @@ serial-recur: serial/sudoku-serial-recur.c
 serial-iter: serial/sudoku-serial-iter.c
 	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
 
-omp: omp/sudoku-omp.c
-	$(CC) omp/sudoku-omp.c -fopenmp $(CFLAGS) -o $(BINARY)-omp
+omp: omp/
+	$(CC) omp/sudoku-omp_dfsv1.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv1
+	$(CC) omp/sudoku-omp_dfsv2.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv2
+	$(CC) omp/sudoku-omp_dfsv3.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv3
+	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_tasks
+	$(CC) omp/sudoku-omp_subqueues.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_subqueries
 
 clean:
-	-rm $(BINARY)*
-	-rm $(wildcard *.o)
+	-@rm $(BINARY)*
 
 .PHONY: default all clean test serial-recur serial-iter omp
