@@ -1,12 +1,12 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <omp.h>
 
 #define N_ARGS 2
 #define EMPTY 0
@@ -40,10 +40,9 @@ typedef struct queue_struct {
 sudoku *to_solve;
 queue *q;
 
-
 queue *init_queue() {
 
-    queue *new_queue = (queue*) malloc(sizeof(queue));
+    queue *new_queue = (queue *)malloc(sizeof(queue));
 
     new_queue->size = 0;
     new_queue->head = NULL;
@@ -53,9 +52,9 @@ queue *init_queue() {
 }
 
 node *dequeue(queue *to_dequeue) {
-    
+
     node *item;
-    if(to_dequeue->size == 0)
+    if (to_dequeue->size == 0)
         return NULL;
     item = to_dequeue->head;
     to_dequeue->head = (to_dequeue->head)->prev;
@@ -64,7 +63,7 @@ node *dequeue(queue *to_dequeue) {
 }
 
 int enqueue(node *item, queue *to_enqueue) {
- 
+
     if (to_enqueue == NULL || item == NULL) {
         return false;
     }
@@ -80,7 +79,6 @@ int enqueue(node *item, queue *to_enqueue) {
     to_enqueue->size++;
     return true;
 }
-
 
 void print_error(char *error) {
     fprintf(stderr, error);
@@ -100,15 +98,14 @@ void free_node(node *item) {
 }
 
 void free_queue(queue *to_free) {
-    
+
     node *item;
-    while(q->size != 0) {
+    while (q->size != 0) {
         item = dequeue(to_free);
         free_node(item);
     }
     free(to_free);
 }
-
 
 sudoku *init_sudoku(int box_size) {
     sudoku *new_sudoku = (sudoku *)malloc(sizeof(sudoku));
@@ -130,8 +127,6 @@ sudoku *init_sudoku(int box_size) {
     return new_sudoku;
 }
 
-
-
 // Print grid
 void print_grid(sudoku *plays) {
     for (int row = 0; row < to_solve->n; row++) {
@@ -146,10 +141,10 @@ void print_queue(queue *to_print) {
     node *item;
     item = to_print->head;
     printf("Queue state\n");
-    while(item != NULL) {
+    while (item != NULL) {
         print_grid(item->plays);
         item = item->prev;
-    }  
+    }
     printf("\n");
 }
 
@@ -177,7 +172,8 @@ bool valid_in_row_and_col(sudoku *plays, int row, int col, int num) {
 
 // Check if it is safe to put number in position
 bool safe(sudoku *plays, int row, int col, int num) {
-    return valid_in_box(plays, row, col, num) && valid_in_row_and_col(plays, row, col, num);
+    return valid_in_box(plays, row, col, num) &&
+           valid_in_row_and_col(plays, row, col, num);
 }
 
 bool safe_by_square(sudoku *plays, square *to_test, int num) {
@@ -195,39 +191,38 @@ square *get_square_by_ptr(int ptr) {
 
 node *create_node(sudoku *to_copy, int ptr) {
 
-    node *new_node = (node*) malloc(sizeof(node));
+    node *new_node = (node *)malloc(sizeof(node));
 
     new_node->prev = NULL;
     new_node->plays = init_sudoku(to_solve->box_size);
 
-    for(int i = 0; i<to_solve->n; i++) {
-        for(int j = 0; j<to_solve->n; j++) {
+    for (int i = 0; i < to_solve->n; i++) {
+        for (int j = 0; j < to_solve->n; j++) {
             (new_node->plays)->grid[i][j] = to_copy->grid[i][j];
         }
     }
-  
-    new_node->next_ptr = ptr+1;
-    
+
+    new_node->next_ptr = ptr + 1;
+
     return new_node;
 }
 
 void cpy_final_plays(sudoku *plays) {
 
     for (int i = 0; i < to_solve->n_plays; ++i) {
-        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] = 
+        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] =
             plays->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col];
     }
     return;
 }
 
-
 int solve() {
-        
-    int finish = 0, i = 0,  j = 0/*, tid*/;
+
+    int finish = 0, i = 0, j = 0 /*, tid*/;
     q = init_queue();
 
-    // Initialize queue
-    #pragma omp parallel 
+// Initialize queue
+    #pragma omp parallel
     {
         #pragma omp for nowait
         for (i = 1; i <= to_solve->n; i++) {
@@ -235,87 +230,90 @@ int solve() {
                 node *new_node;
                 new_node = create_node(to_solve, 0);
                 set_by_ptr(new_node->plays, 0, i);
-                #pragma omp critical 
+                #pragma omp critical
                 enqueue(new_node, q);
             }
         }
     }
 
-    if(q->size == 0)
-    // No solution
+    if (q->size == 0)
+        // No solution
         return 0;
 
-    //print_queue(q);
+// print_queue(q);
 
-    // Work on the queue
+// Work on the queue
     #pragma omp parallel
     {
         #pragma omp for nowait
-        for (j = 0; j <= q->size; ++j) { 
-        // WARNING
-        // Must check the q->size from time to time
-        // Meaning, if a thread's subqueue exists and the main queue is getting smaller, flush it. 
-            if(!finish) {
+        for (j = 0; j <= q->size; ++j) {
+            // WARNING
+            // Must check the q->size from time to time
+            // Meaning, if a thread's subqueue exists and the main queue is getting
+            // smaller, flush it.
+            if (!finish) {
 
                 node *q_node = NULL;
-                // Get one node from queue
-                #pragma omp critical 
+// Get one node from queue
+                #pragma omp critical
                 {
                     q_node = dequeue(q);
                 }
 
-                if(q_node != NULL) {
+                if (q_node != NULL) {
                     queue *priv_q = init_queue();
                     node *priv_q_node = NULL;
                     node *new_node = NULL;
                     // Initialize private queue
                     for (i = 1; i <= to_solve->n; ++i) {
-                        if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
+                        if (safe_by_square(q_node->plays,
+                                           get_square_by_ptr(q_node->next_ptr), i)) {
                             new_node = create_node(q_node->plays, q_node->next_ptr);
                             set_by_ptr(new_node->plays, q_node->next_ptr, i);
                             enqueue(new_node, priv_q);
-                        }  
+                        }
                     }
-                    
-                    while(priv_q->size != 0) {
 
-                        if(!finish) { // This should be optimized
+                    while (priv_q->size != 0) {
+
+                        if (!finish) { // This should be optimized
 
                             priv_q_node = dequeue(priv_q);
-                            
-                            for (i = 1; i <= to_solve->n; ++i) {
-                                if (safe_by_square(priv_q_node->plays, get_square_by_ptr(priv_q_node->next_ptr), i)) {
 
-                                    if((priv_q_node->next_ptr)+1 == to_solve->n_plays) {
-                                    // Solution was found
-                                        #pragma omp atomic 
+                            for (i = 1; i <= to_solve->n; ++i) {
+                                if (safe_by_square(priv_q_node->plays,
+                                                   get_square_by_ptr(priv_q_node->next_ptr),
+                                                   i)) {
+
+                                    if ((priv_q_node->next_ptr) + 1 == to_solve->n_plays) {
+                                        // Solution was found
+                                        #pragma omp atomic
                                         finish++;
                                         set_by_ptr(priv_q_node->plays, priv_q_node->next_ptr, i);
                                         cpy_final_plays(priv_q_node->plays);
-                                    }
-                                    else {
-                                        new_node = create_node(priv_q_node->plays, priv_q_node->next_ptr);
+                                    } else {
+                                        new_node =
+                                            create_node(priv_q_node->plays, priv_q_node->next_ptr);
                                         set_by_ptr(new_node->plays, priv_q_node->next_ptr, i);
                                         enqueue(new_node, priv_q);
                                         new_node = NULL;
                                     }
-                                }  
+                                }
                             }
                             free_node(priv_q_node);
-                        }      
+                        }
                     }
-                       
+
                     free_node(q_node);
                 }
             }
         }
     }
 
-    if(finish) {
+    if (finish) {
         return true;
     }
     return false;
-
 }
 
 int read_file(const char *filename) {

@@ -2,9 +2,9 @@
  * ----------------
  * BFS search w/ single processor managing
  * The queue is composed of items, each one having a puzzle grid.
- * A single processor takes one item of the queue and distributes it by N threads
- * If the thread see the play as valid, inserts a new item with it in queue
- * Slower than serial. 
+ * A single processor takes one item of the queue and distributes it by N
+ * threads If the thread see the play as valid, inserts a new item with it in
+ * queue Slower than serial.
  *
  * Benchmarks
  * 4x4: ~0.005s
@@ -12,8 +12,7 @@
  *
  * Notes
  * Using 5 cores.
-*/
-
+ */
 
 #include <errno.h>
 #include <inttypes.h>
@@ -249,7 +248,7 @@ int solve() {
     node *new_node, *q_node;
     q = init_queue();
 
-// Initialize queue
+    // Initialize queue
     #pragma omp parallel private(new_node)
     #pragma omp for
     for (i = 1; i <= to_solve->n; i++) {

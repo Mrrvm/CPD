@@ -13,24 +13,23 @@
  * Tests
  * Tried a filled squares vector, to speedup the grid copy in node creation,
  * Tried parallelizing the copy
- * 
+ *
  * Updates
  * Te second for is now, nowait
  *
  * Notes
  * Using 5 cores.
-*/
-
+ */
 
 #include <errno.h>
 #include <inttypes.h>
+#include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <omp.h>
 
 #define N_ARGS 2
 #define EMPTY 0
@@ -64,10 +63,9 @@ typedef struct queue_struct {
 sudoku *to_solve;
 queue *q;
 
-
 queue *init_queue() {
 
-    queue *new_queue = (queue*) malloc(sizeof(queue));
+    queue *new_queue = (queue *)malloc(sizeof(queue));
 
     new_queue->size = 0;
     new_queue->head = NULL;
@@ -77,9 +75,9 @@ queue *init_queue() {
 }
 
 node *dequeue() {
-    
+
     node *item;
-    if(q->size == 0)
+    if (q->size == 0)
         return NULL;
     item = q->head;
     q->head = (q->head)->prev;
@@ -88,7 +86,7 @@ node *dequeue() {
 }
 
 int enqueue(node *item) {
- 
+
     if (q == NULL || item == NULL) {
         return false;
     }
@@ -104,7 +102,6 @@ int enqueue(node *item) {
     q->size++;
     return true;
 }
-
 
 void print_error(char *error) {
     fprintf(stderr, error);
@@ -124,15 +121,14 @@ void free_node(node *item) {
 }
 
 void free_queue() {
-    
+
     node *item;
-    while(q->size != 0) {
+    while (q->size != 0) {
         item = dequeue(q);
         free_node(item);
     }
     free(q);
 }
-
 
 sudoku *init_sudoku(int box_size) {
     sudoku *new_sudoku = (sudoku *)malloc(sizeof(sudoku));
@@ -154,8 +150,6 @@ sudoku *init_sudoku(int box_size) {
     return new_sudoku;
 }
 
-
-
 // Print grid
 void print_grid(sudoku *plays) {
     for (int row = 0; row < to_solve->n; row++) {
@@ -170,10 +164,10 @@ void print_queue() {
     node *item;
     item = q->head;
     printf("Queue state\n");
-    while(item != NULL) {
+    while (item != NULL) {
         print_grid(item->plays);
         item = item->prev;
-    }  
+    }
     printf("\n");
 }
 
@@ -201,7 +195,8 @@ bool valid_in_row_and_col(sudoku *plays, int row, int col, int num) {
 
 // Check if it is safe to put number in position
 bool safe(sudoku *plays, int row, int col, int num) {
-    return valid_in_box(plays, row, col, num) && valid_in_row_and_col(plays, row, col, num);
+    return valid_in_box(plays, row, col, num) &&
+           valid_in_row_and_col(plays, row, col, num);
 }
 
 bool safe_by_square(sudoku *plays, square *to_test, int num) {
@@ -219,39 +214,38 @@ square *get_square_by_ptr(int ptr) {
 
 node *create_node(sudoku *to_copy, int ptr) {
 
-    node *new_node = (node*) malloc(sizeof(node));
+    node *new_node = (node *)malloc(sizeof(node));
 
     new_node->prev = NULL;
     new_node->plays = init_sudoku(to_solve->box_size);
 
-    for(int i = 0; i<to_solve->n; i++) {
-        for(int j = 0; j<to_solve->n; j++) {
+    for (int i = 0; i < to_solve->n; i++) {
+        for (int j = 0; j < to_solve->n; j++) {
             (new_node->plays)->grid[i][j] = to_copy->grid[i][j];
         }
     }
-  
-    new_node->next_ptr = ptr+1;
-    
+
+    new_node->next_ptr = ptr + 1;
+
     return new_node;
 }
 
 void cpy_final_plays(sudoku *plays) {
 
     for (int i = 0; i < to_solve->n_plays; ++i) {
-        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] = 
+        to_solve->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col] =
             plays->grid[to_solve->empty_sq[i]->row][to_solve->empty_sq[i]->col];
     }
     return;
 }
 
-
 int solve() {
-        
-    int finish = 0, i = 0/*, tid*/;
+
+    int finish = 0, i = 0 /*, tid*/;
     q = init_queue();
 
-    // Initialize queue
-    #pragma omp parallel 
+// Initialize queue
+    #pragma omp parallel
     {
         #pragma omp for nowait
         for (i = 1; i <= to_solve->n; i++) {
@@ -259,70 +253,68 @@ int solve() {
                 node *new_node;
                 new_node = create_node(to_solve, 0);
                 set_by_ptr(new_node->plays, 0, i);
-                #pragma omp critical 
+                #pragma omp critical
                 enqueue(new_node);
             }
         }
     }
 
-    if(q->size == 0)
-    // No solution
+    if (q->size == 0)
+        // No solution
         return 0;
 
-    //print_queue();
+    // print_queue();
 
     // Work on the queue
-    while(q->size != 0) {
+    while (q->size != 0) {
 
-        #pragma omp parallel 
+        #pragma omp parallel
         {
             node *q_node = NULL;
-            // Get one node from queue
-            #pragma omp critical 
-            {
-                q_node = dequeue();
-            }
+// Get one node from queue
+            #pragma omp critical
+            { q_node = dequeue(); }
 
-            if(q_node != NULL) {
-                if(q_node->next_ptr == to_solve->n_plays) {
-                // Solution was found
+            if (q_node != NULL) {
+                if (q_node->next_ptr == to_solve->n_plays) {
+                    // Solution was found
                     finish++;
                     cpy_final_plays(q_node->plays);
                 }
 
-                #pragma omp parallel 
+                #pragma omp parallel
                 {
-                    //tid = omp_get_thread_num();
-                    if(!finish) {
+                    // tid = omp_get_thread_num();
+                    if (!finish) {
                         #pragma omp for nowait
                         for (i = 1; i <= to_solve->n; i++) {
-                            //printf("[Thread %d]: trying %d on play %d\n", tid, i, q_node->curr_play); fflush(stdout);
-                            if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
+                            // printf("[Thread %d]: trying %d on play %d\n", tid, i,
+                            // q_node->curr_play); fflush(stdout);
+                            if (safe_by_square(q_node->plays,
+                                               get_square_by_ptr(q_node->next_ptr), i)) {
                                 node *new_node;
                                 new_node = create_node(q_node->plays, q_node->next_ptr);
                                 set_by_ptr(new_node->plays, q_node->next_ptr, i);
-                                #pragma omp critical 
+                                #pragma omp critical
                                 {
-                                    //printf("[Thread %d]: enqueued - %d\n", tid, q->size); fflush(stdout);
+                                    // printf("[Thread %d]: enqueued - %d\n", tid, q->size);
+                                    // fflush(stdout);
                                     enqueue(new_node);
-
                                 }
-                            }          
+                            }
                         }
                         #pragma omp single nowait
                         free_node(q_node);
                     }
                 }
-            
             }
         }
     }
 
-    if(finish) {
+    if (finish) {
         return true;
     }
     return false;
-
 }
 
 int read_file(const char *filename) {
