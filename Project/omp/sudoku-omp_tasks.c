@@ -196,14 +196,11 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 void solve(int id, sudoku state) {
-    printf("New ID: %d\n", id);
-    printf("gDONE: %d\n", gDONE);
-    print_grid(state);
     if (gDONE) {
         return;
     }
 
-    printf("N Empty Square %ld\n", gMOAS->n_empty_sq);
+    print_grid(state);
     /* if in the last solve layer check if solved and start popping */
     if (id == gMOAS->n_empty_sq - 1) {
         for (int i = 1; i <= gMOAS->n; i++) {
@@ -223,9 +220,8 @@ void solve(int id, sudoku state) {
         {
             if (safe(state, gMOAS->empty_sq[id], i)) {
                 state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-                print_grid(state);
                 sudoku new_state = new_state_copy(state);
-                solve(id++, new_state);
+                solve(++id, new_state);
             }
         }
     }
