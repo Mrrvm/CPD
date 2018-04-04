@@ -243,7 +243,7 @@ int solve() {
     int finish = 0, i = 0, j = 0 /*, tid*/;
     q = init_queue();
 
-// Initialize queue
+    // Initialize queue
     #pragma omp parallel
     {
         #pragma omp for nowait
@@ -262,9 +262,9 @@ int solve() {
         // No solution
         return 0;
 
-// print_queue();
+    // print_queue();
 
-// Work on the queue
+    // Work on the queue
     #pragma omp parallel
     {
         #pragma omp for nowait
@@ -273,7 +273,7 @@ int solve() {
             // Meaning, if a thread's subqueue exists and the man queue is getting
             // smaller, flush it.
             node *q_node = NULL;
-// Get one node from queue
+            // Get one node from queue
             #pragma omp critical
             {
                 q_node = dequeue();
@@ -281,7 +281,7 @@ int solve() {
 
             if (q_node != NULL) {
                 if (q_node->next_ptr == to_solve->n_plays) {
-                    // Solution was found
+// Solution was found
                     #pragma omp atomic
                     finish++;
                     cpy_final_plays(q_node->plays);
