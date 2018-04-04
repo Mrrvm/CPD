@@ -288,6 +288,7 @@ int solve() {
             if(q_node != NULL) {
                 if(q_node->next_ptr == to_solve->n_plays) {
                 // Solution was found
+                    #pragma omp atomic
                     finish++;
                     cpy_final_plays(q_node->plays);
                 }

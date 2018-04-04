@@ -52,32 +52,32 @@ queue *init_queue() {
     return new_queue;
 }
 
-node *dequeue() {
+node *dequeue(queue *to_dequeue) {
     
     node *item;
-    if(q->size == 0)
+    if(to_dequeue->size == 0)
         return NULL;
-    item = q->head;
-    q->head = (q->head)->prev;
-    q->size--;
+    item = to_dequeue->head;
+    to_dequeue->head = (to_dequeue->head)->prev;
+    to_dequeue->size--;
     return item;
 }
 
-int enqueue(node *item) {
+int enqueue(node *item, queue *to_enqueue) {
  
-    if (q == NULL || item == NULL) {
+    if (to_enqueue == NULL || item == NULL) {
         return false;
     }
 
-    if (q->size == 0) {
-        q->head = item;
-        q->tail = item;
+    if (to_enqueue->size == 0) {
+        to_enqueue->head = item;
+        to_enqueue->tail = item;
 
     } else {
-        q->tail->prev = item;
-        q->tail = item;
+        to_enqueue->tail->prev = item;
+        to_enqueue->tail = item;
     }
-    q->size++;
+    to_enqueue->size++;
     return true;
 }
 
@@ -99,14 +99,14 @@ void free_node(node *item) {
     free(item);
 }
 
-void free_queue() {
+void free_queue(queue *to_free) {
     
     node *item;
     while(q->size != 0) {
-        item = dequeue(q);
+        item = dequeue(to_free);
         free_node(item);
     }
-    free(q);
+    free(to_free);
 }
 
 
@@ -141,10 +141,10 @@ void print_grid(sudoku *plays) {
     }
 }
 
-void print_queue() {
+void print_queue(queue *to_print) {
 
     node *item;
-    item = q->head;
+    item = to_print->head;
     printf("Queue state\n");
     while(item != NULL) {
         print_grid(item->plays);
@@ -236,7 +236,7 @@ int solve() {
                 new_node = create_node(to_solve, 0);
                 set_by_ptr(new_node->plays, 0, i);
                 #pragma omp critical 
-                enqueue(new_node);
+                enqueue(new_node, q);
             }
         }
     }
@@ -245,35 +245,67 @@ int solve() {
     // No solution
         return 0;
 
-    //print_queue();
+    //print_queue(q);
 
     // Work on the queue
     #pragma omp parallel
     {
         #pragma omp for nowait
         for (j = 0; j <= q->size; ++j) { 
+        // WARNING
         // Must check the q->size from time to time
-        // Meaning, if a thread's subqueue exists and the man queue is getting smaller, flush it. 
-            node *q_node = NULL;
-            // Get one node from queue
-            #pragma omp critical 
-            {
-                q_node = dequeue();
-            }
+        // Meaning, if a thread's subqueue exists and the main queue is getting smaller, flush it. 
+            if(!finish) {
 
-            if(q_node != NULL) {
-                if(q_node->next_ptr == to_solve->n_plays) {
-                // Solution was found
-                    finish++;
-                    cpy_final_plays(q_node->plays);
+                node *q_node = NULL;
+                // Get one node from queue
+                #pragma omp critical 
+                {
+                    q_node = dequeue(q);
                 }
 
-                #pragma omp parallel 
-                {
-                    //tid = omp_get_thread_num();
-                    if(!finish) {
-                        
+                if(q_node != NULL) {
+                    queue *priv_q = init_queue();
+                    node *priv_q_node = NULL;
+                    node *new_node = NULL;
+                    // Initialize private queue
+                    for (i = 1; i <= to_solve->n; ++i) {
+                        if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
+                            new_node = create_node(q_node->plays, q_node->next_ptr);
+                            set_by_ptr(new_node->plays, q_node->next_ptr, i);
+                            enqueue(new_node, priv_q);
+                        }  
                     }
+                    
+                    while(priv_q->size != 0) {
+
+                        if(!finish) { // This should be optimized
+
+                            priv_q_node = dequeue(priv_q);
+                            
+                            for (i = 1; i <= to_solve->n; ++i) {
+                                if (safe_by_square(priv_q_node->plays, get_square_by_ptr(priv_q_node->next_ptr), i)) {
+
+                                    if((priv_q_node->next_ptr)+1 == to_solve->n_plays) {
+                                    // Solution was found
+                                        #pragma omp atomic 
+                                        finish++;
+                                        set_by_ptr(priv_q_node->plays, priv_q_node->next_ptr, i);
+                                        cpy_final_plays(priv_q_node->plays);
+                                    }
+                                    else {
+                                        new_node = create_node(priv_q_node->plays, priv_q_node->next_ptr);
+                                        set_by_ptr(new_node->plays, priv_q_node->next_ptr, i);
+                                        enqueue(new_node, priv_q);
+                                        new_node = NULL;
+                                    }
+                                }  
+                            }
+                            free_node(priv_q_node);
+                        }      
+                    }
+                       
+                    free_node(q_node);
                 }
             }
         }
