@@ -9,6 +9,7 @@
  * Benchmarks
  * 4x4: 0.0004s
  * 9x9: 50s
+ * 16x16: 46.3s
  *
  * Tests
  * Tried a filled squares vector, to speedup the grid copy in node creation,
@@ -157,6 +158,7 @@ void print_grid(sudoku to_print) {
         }
         printf("\n");
     }
+    printf("\n");
 }
 
 // Check box, row and column for safety
@@ -200,7 +202,6 @@ void solve(int id, sudoku state) {
         return;
     }
 
-    print_grid(state);
     /* if in the last solve layer check if solved and start popping */
     if (id == gMOAS->n_empty_sq - 1) {
         for (int i = 1; i <= gMOAS->n; i++) {
@@ -215,19 +216,23 @@ void solve(int id, sudoku state) {
     }
 
     /* try each son solution */
-    for (int i = 1; i <= gMOAS->n; i++) {
-        /* #pragma omp task untied */
-        {
-            if (safe(state, gMOAS->empty_sq[id], i)) {
-                state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-                sudoku new_state = new_state_copy(state);
-                solve(++id, new_state);
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (int i = 1; i <= gMOAS->n; i++) {
+            #pragma omp task untied
+            {
+                if (safe(state, gMOAS->empty_sq[id], i)) {
+                    state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
+                    sudoku new_state = new_state_copy(state);
+                    solve(id + 1, new_state);
+                }
             }
         }
-    }
 
+        #pragma omp taskwait
+    }
     free_sudoku(state);
-    /* #pragma omp taskwait */
 }
 
 int main(int argc, char const *argv[]) {
@@ -246,7 +251,6 @@ int main(int argc, char const *argv[]) {
     }
 
     print_grid(gMOAS->to_solve);
-    printf("\n");
 
     begin = clock();
     // Solve the puzzle
