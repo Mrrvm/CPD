@@ -123,6 +123,7 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 void solve(int id, sudoku state) {
+    printf("New ID: %d\n", id);
     if (gDONE) {
         return;
     }
@@ -131,6 +132,7 @@ void solve(int id, sudoku state) {
     if (id == gMOAS->n_empty_sq - 1) {
         for (int i = 1; i <= gMOAS->n; i++) {
             if (safe(state, gMOAS->empty_sq[id], i)) {
+                state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
                 copy_to_gMOAS(state);
                 gDONE++;
                 return;
@@ -141,9 +143,11 @@ void solve(int id, sudoku state) {
 
     /* try each son solution */
     for (int i = 1; i <= gMOAS->n; i++) {
-        #pragma omp task untied
+        /* #pragma omp task untied */
         {
             if (safe(state, gMOAS->empty_sq[id], i)) {
+                state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
+                print_grid(state);
                 sudoku new_state = new_state_copy(state);
                 solve(id++, new_state);
             }
@@ -151,7 +155,7 @@ void solve(int id, sudoku state) {
     }
 
     free_sudoku(state);
-    #pragma omp taskwait
+    /* #pragma omp taskwait */
 }
 
 int read_file(const char *filename) {
