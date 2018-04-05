@@ -30,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define THREADS 2
 #define N_ARGS 2
 
 typedef uint_fast8_t *square;
@@ -47,6 +46,7 @@ typedef struct moas_t {
 } moas;
 
 int gDONE;
+int thread_count = 4;
 moas *gMOAS;
 
 void print_error(char *error) {
@@ -80,13 +80,11 @@ int read_file(const char *filename) {
 
   /* Read the file */
   uint_fast32_t iter = 0;
-  for (int i = 0; i < gMOAS->n; i++) {
-    for (int j = 0; j < gMOAS->n; j++) {
-      fscanf(sudoku_file, "%2" SCNu8, &num);
-      gMOAS->to_solve[i * gMOAS->n + j] = num;
-      if (num == 0) {
-        iter++;
-      }
+  for (int i = 0; i < gMOAS->n * gMOAS->n; i++) {
+    fscanf(sudoku_file, "%2" SCNu8, &num);
+    gMOAS->to_solve[i] = num;
+    if (num == 0) {
+      iter++;
     }
   }
 
@@ -188,6 +186,7 @@ void solve(int id, sudoku state) {
   }
 
   /* try each son solution */
+
   for (int i = 1; i <= gMOAS->n; i++) {
 #pragma omp task firstprivate(i, id, state)
     {
@@ -198,17 +197,17 @@ void solve(int id, sudoku state) {
       }
     }
   }
-
 #pragma omp taskwait
   free_sudoku(state);
 }
 
 int main(int argc, char const *argv[]) {
-
-  if (argc != N_ARGS) {
+  if (argc < N_ARGS) {
     char error[64];
     sprintf(error, "Usage: %s filename\n", argv[0]);
     print_error(error);
+  } else if (argc == 3) {
+    thread_count = atoi(argv[2]);
   }
 
   if (read_file(argv[1]) != 0) {
@@ -222,7 +221,7 @@ int main(int argc, char const *argv[]) {
 
   // Solve the puzzle
   sudoku new_state = new_state_copy(gMOAS->to_solve);
-  omp_set_num_threads(THREADS);
+  omp_set_num_threads(thread_count);
   double start = omp_get_wtime();
 #pragma omp parallel
   {
