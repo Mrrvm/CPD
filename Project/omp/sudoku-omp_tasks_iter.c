@@ -197,44 +197,6 @@ task_log *new_task_log(sudoku old_state, int next_ptr, int steps) {
     new->steps = steps;
 }
 
-void solve(int id, sudoku state) {
-    if (gDONE) {
-        return;
-    }
-
-    /* if in the last solve layer check if solved and start popping */
-    if (id == gMOAS->n_empty_sq - 1) {
-        for (int i = 1; i <= gMOAS->n; i++) {
-            if (safe(state, gMOAS->empty_sq[id], i)) {
-                state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-                copy_to_gMOAS(state);
-                gDONE = true;
-                return;
-            }
-        }
-        return;
-    }
-
-    /* try each son solution */
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (int i = 1; i <= gMOAS->n; i++) {
-            #pragma omp task untied
-            {
-                if (safe(state, gMOAS->empty_sq[id], i)) {
-                    state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-                    sudoku new_state = new_state_copy(state);
-                    solve(id + 1, new_state);
-                }
-            }
-        }
-
-        #pragma omp taskwait
-    }
-    free_sudoku(state);
-}
-
 void solve_task_sudoku (task_log *task_l) {
     task_log *new_task_l;
     int nplays, *v_plays;
@@ -252,7 +214,7 @@ void solve_task_sudoku (task_log *task_l) {
     aim_ptr = base_ptr + nplays;
 
     if (nplays == 0) {
-        return;    
+        return;
     }
 
     v_plays = (int *) malloc(nplays * sizeof(int));
@@ -279,7 +241,7 @@ void solve_task_sudoku (task_log *task_l) {
 
         /* Check if next play is valid. */
         if (safe(task_l->state, gMOAS->empty_sq[ptr+base_ptr], v_plays[ptr])) {
-        
+
             task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
             v_plays[ptr]++; /* always to next */
 
@@ -294,9 +256,9 @@ void solve_task_sudoku (task_log *task_l) {
                 /* Create new task */
                 new_task_l = (task_log*) new_task_log ( task_l->state,
                                               aim_ptr, 2*task_l->steps );
-                
+
                 /* Launch */
-                #pragma omp task untied
+                #pragma omp task firstprivate(new_task_l)
                 {
                     solve_task_sudoku(new_task_l);
                 }
@@ -308,7 +270,7 @@ void solve_task_sudoku (task_log *task_l) {
                 gDONE = 1;
                 copy_to_gMOAS(task_l->state);
 
-                free(task_l);                
+                free(task_l);
                 return;
             }
         } else {
@@ -324,39 +286,43 @@ void solve_task_sudoku (task_log *task_l) {
 }
 
 int main(int argc, char const *argv[]) {
-    clock_t begin, end;
-    task_log *orig_task_l;
+  task_log *orig_task_l;
 
-    if (argc != N_ARGS) {
-        char error[64];
-        sprintf(error, "Usage: %s filename\n", argv[0]);
-        print_error(error);
-    }
+  if (argc != N_ARGS) {
+    char error[64];
+    sprintf(error, "Usage: %s filename\n", argv[0]);
+    print_error(error);
+  }
 
-    if (read_file(argv[1]) != 0) {
-        char error[64];
-        sprintf(error, "Unable to read file %s\n", argv[1]);
-        print_error(error);
-    }
+  if (read_file(argv[1]) != 0) {
+    char error[64];
+    sprintf(error, "Unable to read file %s\n", argv[1]);
+    print_error(error);
+  }
 
-    print_grid(gMOAS->to_solve);
+  puts("~~~ Input Sudoku ~~~");
+  print_grid(gMOAS->to_solve);
 
-    begin = clock();
-    // Solve the puzzle
-    orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 2);
+  // Solve the puzzle
+  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 1);
+  double start = omp_get_wtime();
+#pragma omp parallel
+  {
+#pragma omp single
     solve_task_sudoku(orig_task_l);
-    end = clock();
+  }
+  double finish = omp_get_wtime();
+  if (gDONE) {
+    puts("~~~ Output Sudoku ~~~");
+    print_grid(gMOAS->to_solve);
+    printf("Solved Sudoku\n");
+    // Solution found
+  } else {
+    printf("Did not solve Sudoku\n");
+    // No solution
+  };
 
-    if (gDONE) {
-        print_grid(gMOAS->to_solve);
-        printf("Solved Sudoku\n");
-        // Solution found
-    } else {
-        printf("Did not solve Sudoku\n");
-        // No solution
-    };
-
-    free_gMOAS();
-    printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
-    return 0;
+  free_gMOAS();
+  printf("Total Time %lfs\n", (double)(finish - start));
+  return 0;
 }
