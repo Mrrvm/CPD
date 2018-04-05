@@ -197,6 +197,14 @@ task_log *new_task_log(sudoku old_state, int next_ptr, int steps) {
     new->steps = steps;
 }
 
+void print_branch(int level, int try) {
+  int i;
+
+  for(i = 0; i < level; i++) printf("  ");
+
+  printf("%d\n", try);
+}
+
 void solve_task_sudoku (task_log *task_l) {
     task_log *new_task_l;
     int nplays, *v_plays;
@@ -210,8 +218,10 @@ void solve_task_sudoku (task_log *task_l) {
 
     base_ptr = task_l->next_ptr;
 
-    nplays = MIN(gMOAS->n_empty_sq - task_l->next_ptr, task_l->steps);
+    nplays = MIN((gMOAS->n_empty_sq - task_l->next_ptr), task_l->steps);
     aim_ptr = base_ptr + nplays;
+
+    printf("*** Task: b:%d s:%d a:%d ***\n", base_ptr, nplays, aim_ptr);
 
     if (nplays == 0) {
         return;
@@ -241,6 +251,8 @@ void solve_task_sudoku (task_log *task_l) {
 
         /* Check if next play is valid. */
         if (safe(task_l->state, gMOAS->empty_sq[ptr+base_ptr], v_plays[ptr])) {
+
+            print_branch(ptr+base_ptr, v_plays[ptr]);
 
             task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
             v_plays[ptr]++; /* always to next */
