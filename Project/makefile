@@ -17,6 +17,9 @@ serial-iter: serial/sudoku-serial-iter.c
 tasks: omp/sudoku-omp_tasks.c
 	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
+masks: omp/sudoku-omp_masks.c
+	$(CC) omp/sudoku-omp_masks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+
 static: omp/sudoku-omp_tasks_stati.c
 	$(CC) omp/sudoku-omp_tasks_stati.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
