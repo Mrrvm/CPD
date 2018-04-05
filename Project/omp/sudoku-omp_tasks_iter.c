@@ -195,6 +195,8 @@ task_log *new_task_log(sudoku old_state, int next_ptr, int steps) {
     new->state = new_state_copy(old_state);
     new->next_ptr = next_ptr;
     new->steps = steps;
+
+    return new;
 }
 
 void print_branch(int level, int try) {
@@ -218,10 +220,10 @@ void solve_task_sudoku (task_log *task_l) {
 
     base_ptr = task_l->next_ptr;
 
-    nplays = MIN((gMOAS->n_empty_sq - task_l->next_ptr), task_l->steps);
+    nplays = MIN((gMOAS->n_empty_sq - task_l->next_ptr - 1), task_l->steps);
     aim_ptr = base_ptr + nplays;
 
-    printf("*** Task: b:%d s:%d a:%d ***\n", base_ptr, nplays, aim_ptr);
+    //printf("*** Task: b:%d s:%d a:%d ***\n", base_ptr, nplays, aim_ptr);
 
     if (nplays == 0) {
         return;
@@ -252,7 +254,7 @@ void solve_task_sudoku (task_log *task_l) {
         /* Check if next play is valid. */
         if (safe(task_l->state, gMOAS->empty_sq[ptr+base_ptr], v_plays[ptr])) {
 
-            print_branch(ptr+base_ptr, v_plays[ptr]);
+            //print_branch(ptr+base_ptr, v_plays[ptr]);
 
             task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
             v_plays[ptr]++; /* always to next */
@@ -262,12 +264,12 @@ void solve_task_sudoku (task_log *task_l) {
                 /* Branch */
 
                 v_plays[ptr] = 1;
-            } else if (aim_ptr < gMOAS->n_empty_sq) {
+            } else if (aim_ptr < (gMOAS->n_empty_sq - 1)) {
                 /* Reached aim level */
 
                 /* Create new task */
                 new_task_l = (task_log*) new_task_log ( task_l->state,
-                                              aim_ptr, 2*task_l->steps );
+                                              aim_ptr, task_l->steps*task_l->steps );
 
                 /* Launch */
                 #pragma omp task firstprivate(new_task_l)
@@ -292,9 +294,10 @@ void solve_task_sudoku (task_log *task_l) {
         }
     }
 
-    #pragma omp taskwait
-
     free(task_l);
+    free(v_plays);
+
+    #pragma omp taskwait
 }
 
 int main(int argc, char const *argv[]) {
@@ -316,12 +319,13 @@ int main(int argc, char const *argv[]) {
   print_grid(gMOAS->to_solve);
 
   // Solve the puzzle
-  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 1);
+  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 2);
   double start = omp_get_wtime();
-#pragma omp parallel
+  #pragma omp parallel
   {
-#pragma omp single
+    #pragma omp single
     solve_task_sudoku(orig_task_l);
+
   }
   double finish = omp_get_wtime();
   if (gDONE) {
