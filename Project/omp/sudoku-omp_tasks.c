@@ -30,21 +30,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CUTOFF 20 // arbitrary
 #define THREADS 2
 #define N_ARGS 2
 
-typedef struct square_struct {
-  int_fast8_t row;
-  int_fast8_t col;
-  int_fast8_t box;
-} square;
+typedef uint_fast8_t *square;
 
-typedef uint_fast8_t **sudoku;
+typedef uint_fast8_t *sudoku;
 
 // Mother of all sudokus
 typedef struct moas_t {
-  square **empty_sq;
+  square empty_sqs;
   sudoku to_solve;
   int_fast32_t n;
   int_fast32_t box_size;
@@ -62,7 +57,6 @@ void print_error(char *error) {
 int read_file(const char *filename) {
   FILE *sudoku_file;
   int box_size;
-  uint_fast32_t iter;
   uint8_t num;
 
   /* Opens file */
@@ -82,19 +76,14 @@ int read_file(const char *filename) {
   gMOAS->box_size = box_size;
   gMOAS->n = box_size * box_size;
 
-  gMOAS->to_solve = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
-  for (int i = 0; i < gMOAS->n; i++) {
-    gMOAS->to_solve[i] =
-        (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
-  }
+  gMOAS->to_solve = (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
 
   /* Read the file */
-  iter = 0;
+  uint_fast32_t iter = 0;
   for (int i = 0; i < gMOAS->n; i++) {
     for (int j = 0; j < gMOAS->n; j++) {
       fscanf(sudoku_file, "%2" SCNu8, &num);
-
-      gMOAS->to_solve[i][j] = num;
+      gMOAS->to_solve[i * gMOAS->n + j] = num;
       if (num == 0) {
         iter++;
       }
@@ -108,23 +97,12 @@ int read_file(const char *filename) {
 
   // Create aux array of empty squares
   gMOAS->n_empty_sq = iter;
-  gMOAS->empty_sq = (square **)malloc(iter * sizeof(square *));
+  gMOAS->empty_sqs = (square)malloc(iter * sizeof(uint_fast8_t));
 
-  for (uint_fast32_t i = 0; i < iter; i++) {
-    gMOAS->empty_sq[i] = (square *)malloc(sizeof(square));
-  }
-
-  iter = 0;
-  for (int i = 0; i < gMOAS->n; i++) {
-    for (int j = 0; j < gMOAS->n; j++) {
-      if (gMOAS->to_solve[i][j] == 0) {
-        gMOAS->empty_sq[iter]->row = i;
-        gMOAS->empty_sq[iter]->col = j;
-        gMOAS->empty_sq[iter]->box =
-            (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
-
-        iter++;
-      }
+  for (int i = 0, itera = 0; i < gMOAS->n * gMOAS->n; i++) {
+    if (gMOAS->to_solve[i] == 0) {
+      gMOAS->empty_sqs[itera] = i;
+      itera++;
     }
   }
 
@@ -133,29 +111,21 @@ int read_file(const char *filename) {
 }
 
 // Free sudoku typedef
-void free_sudoku(sudoku to_free) {
-  for (int i = 0; i < gMOAS->n; i++) {
-    free(to_free[i]);
-  }
-  free(to_free);
-}
+void free_sudoku(sudoku to_free) { free(to_free); }
 
 // Free global MOAS
 void free_gMOAS() {
   free_sudoku(gMOAS->to_solve);
-  for (int i = 0; i < gMOAS->n_empty_sq; ++i) {
-    free(gMOAS->empty_sq[i]);
-  }
+  free(gMOAS->empty_sqs);
 
-  free(gMOAS->empty_sq);
   free(gMOAS);
 }
 
 // Print grid
 void print_grid(sudoku to_print) {
-  for (int row = 0; row < gMOAS->n; row++) {
-    for (int col = 0; col < gMOAS->n; col++) {
-      printf("%2d ", to_print[row][col]);
+  for (int i = 0; i < gMOAS->n; i++) {
+    for (int j = 0; j < gMOAS->n; j++) {
+      printf("%2d ", to_print[i * gMOAS->n + j]);
     }
     printf("\n");
   }
@@ -163,38 +133,38 @@ void print_grid(sudoku to_print) {
 }
 
 // Check box, row and column for safety
-bool safe(sudoku to_check, square *to_test, int num) {
-  uint_fast8_t row_start = to_test->row - to_test->row % gMOAS->box_size;
-  uint_fast8_t col_start = to_test->col - to_test->col % gMOAS->box_size;
+bool safe(sudoku to_check, int id, int num) {
+  int x = id / gMOAS->n, y = id % gMOAS->n;
 
-  for (int i = 0; i < gMOAS->n; i++) {
-    if (to_check[i][to_test->col] == num || to_check[to_test->row][i] == num) {
+  int bx = (x / gMOAS->box_size) * gMOAS->box_size,
+      by = (y / gMOAS->box_size) * gMOAS->box_size;
+  int j, ox, oy;
+  for (j = 0; j < gMOAS->n; j++) {
+    ox = j / gMOAS->box_size;
+    oy = j % gMOAS->box_size;
+    // check row
+    if (y != j && num == to_check[x * gMOAS->n + j])
       return false;
-    }
+    // check column
+    if (x != j && num == to_check[j * gMOAS->n + y])
+      return false;
+    // check box
+    if (id != ((bx + ox) * gMOAS->n + by + oy) &&
+        num == to_check[(bx + ox) * gMOAS->n + by + oy])
+      return false;
   }
-
-  for (int i = 0; i < gMOAS->box_size; i++)
-    for (int j = 0; j < gMOAS->box_size; j++)
-      if (to_check[i + row_start][j + col_start] == num) {
-        return false;
-      }
-
   return true;
 }
 
 void copy_to_gMOAS(sudoku solved) {
   for (int i = 0; i < gMOAS->n_empty_sq; i++) {
-    gMOAS->to_solve[gMOAS->empty_sq[i]->row][gMOAS->empty_sq[i]->col] =
-        solved[gMOAS->empty_sq[i]->row][gMOAS->empty_sq[i]->col];
+    gMOAS->to_solve[gMOAS->empty_sqs[i]] = solved[gMOAS->empty_sqs[i]];
   }
 }
 
 sudoku new_state_copy(sudoku old_state) {
-  sudoku new_state = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
-  for (int i = 0; i < gMOAS->n; i++) {
-    new_state[i] = (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
-    memcpy(new_state[i], old_state[i], gMOAS->n * sizeof(uint_fast8_t));
-  }
+  sudoku new_state = (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
+  memcpy(new_state, old_state, gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
   return new_state;
 }
 
@@ -206,8 +176,8 @@ void solve(int id, sudoku state) {
   /* if in the last solve layer check if solved and start popping */
   if (id == gMOAS->n_empty_sq - 1) {
     for (int i = 1; i <= gMOAS->n; i++) {
-      if (safe(state, gMOAS->empty_sq[id], i)) {
-        state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
+      if (safe(state, gMOAS->empty_sqs[id], i)) {
+        state[gMOAS->empty_sqs[id]] = i;
         copy_to_gMOAS(state);
         gDONE = true;
         return;
@@ -221,9 +191,9 @@ void solve(int id, sudoku state) {
   for (int i = 1; i <= gMOAS->n; i++) {
 #pragma omp task firstprivate(i, id, state)
     {
-      if (safe(state, gMOAS->empty_sq[id], i)) {
+      if (safe(state, gMOAS->empty_sqs[id], i)) {
         sudoku new_state = new_state_copy(state);
-        new_state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
+        new_state[gMOAS->empty_sqs[id]] = i;
         solve(id + 1, new_state);
       }
     }
