@@ -188,7 +188,7 @@ void solve(int id, sudoku state) {
   /* try each son solution */
 
   for (int i = 1; i <= gMOAS->n; i++) {
-#pragma omp task firstprivate(i, id, state)
+#pragma omp task shared(state) firstprivate(i, id) untied
     {
       if (safe(state, gMOAS->empty_sqs[id], i)) {
         sudoku new_state = new_state_copy(state);
