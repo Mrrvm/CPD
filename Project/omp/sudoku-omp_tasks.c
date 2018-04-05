@@ -25,12 +25,10 @@
 #include <inttypes.h>
 #include <omp.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define CUTOFF 20 // arbitrary
 #define THREADS 2
@@ -236,7 +234,6 @@ void solve(int id, sudoku state) {
 }
 
 int main(int argc, char const *argv[]) {
-  clock_t begin, end;
 
   if (argc != N_ARGS) {
     char error[64];
@@ -250,19 +247,21 @@ int main(int argc, char const *argv[]) {
     print_error(error);
   }
 
+  puts("~~~ Input Sudoku ~~~");
   print_grid(gMOAS->to_solve);
 
-  begin = clock();
   // Solve the puzzle
   sudoku new_state = new_state_copy(gMOAS->to_solve);
   omp_set_num_threads(THREADS);
+  double start = omp_get_wtime();
 #pragma omp parallel
   {
 #pragma omp single
     solve(0, new_state);
   }
-  end = clock();
+  double finish = omp_get_wtime();
   if (gDONE) {
+    puts("~~~ Output Sudoku ~~~");
     print_grid(gMOAS->to_solve);
     printf("Solved Sudoku\n");
     // Solution found
@@ -272,6 +271,6 @@ int main(int argc, char const *argv[]) {
   };
 
   free_gMOAS();
-  printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
+  printf("Total Time %lfs\n", (double)(finish - start));
   return 0;
 }
