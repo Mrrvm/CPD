@@ -55,7 +55,7 @@ int read_file(const char *filename) {
     uint8_t num;
 
     /* Opens file */
-    sudoku_file = fopen(filename, "r");
+    sudoku_file = fopen(filename, "re");
     if (sudoku_file == NULL)
         perror("Could not open file\n");
 
