@@ -49,11 +49,6 @@ int gDONE;
 int thread_count = 4;
 moas *gMOAS;
 
-void print_error(char *error) {
-    perror(error);
-    exit(EXIT_FAILURE);
-}
-
 int read_file(const char *filename) {
     FILE *sudoku_file;
     int box_size;
@@ -62,15 +57,17 @@ int read_file(const char *filename) {
     /* Opens file */
     sudoku_file = fopen(filename, "r");
     if (sudoku_file == NULL)
-        print_error("Could not open file\n");
+        perror("Could not open file\n");
 
     /* Scans first line (aka the square size) */
     if (fscanf(sudoku_file, "%d", &box_size) == EOF)
-        print_error("Could not read file\n");
+        perror("Could not read file\n");
 
     gMOAS = (moas *)malloc(sizeof(moas));
     if (gMOAS == NULL) {
-        print_error("Unable to init MOAS");
+        perror("Unable to init MOAS");
+        fclose(sudoku_file);
+        return -1;
     }
 
     gMOAS->box_size = box_size;
@@ -127,18 +124,22 @@ bool safe(sudoku to_check, int id, int num) {
 
     for (int j = 0; j < gMOAS->n; j++) {
         // check row
-        if (y != j && num == to_check[x * gMOAS->n + j])
+        if (y != j && num == to_check[x * gMOAS->n + j]) {
             return false;
+        }
         // check column
-        if (x != j && num == to_check[j * gMOAS->n + y])
+        if (x != j && num == to_check[j * gMOAS->n + y]) {
             return false;
+        }
         // check box
         int ox = j / gMOAS->box_size;
         int oy = j % gMOAS->box_size;
         if (id != ((bx + ox) * gMOAS->n + by + oy) &&
-                num == to_check[(bx + ox) * gMOAS->n + by + oy])
+                num == to_check[(bx + ox) * gMOAS->n + by + oy]) {
             return false;
+        }
     }
+
     return true;
 }
 
@@ -175,7 +176,8 @@ int main(int argc, char const *argv[]) {
     if (argc < N_ARGS) {
         char error[64];
         sprintf(error, "Usage: %s filename\n", argv[0]);
-        print_error(error);
+        perror(error);
+        return EXIT_FAILURE;
     } else if (argc == 3) {
         thread_count = atoi(argv[2]);
     }
@@ -183,7 +185,8 @@ int main(int argc, char const *argv[]) {
     if (read_file(argv[1]) != 0) {
         char error[64];
         sprintf(error, "Unable to read file %s\n", argv[1]);
-        print_error(error);
+        perror(error);
+        return EXIT_FAILURE;
     }
 
     puts("~~~ Input Sudoku ~~~");
