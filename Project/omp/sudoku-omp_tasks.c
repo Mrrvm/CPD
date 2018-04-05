@@ -25,14 +25,16 @@
 #include <inttypes.h>
 #include <omp.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#define CUTOFF 20 // arbitrary
+#define THREADS 2
 #define N_ARGS 2
-#define EMPTY 0
 
 typedef struct square_struct {
   int_fast8_t row;
@@ -199,7 +201,9 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 void solve(int id, sudoku state) {
+  sudoku new_state;
   if (gDONE) {
+    free_sudoku(state);
     return;
   }
 
@@ -210,29 +214,27 @@ void solve(int id, sudoku state) {
         state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
         copy_to_gMOAS(state);
         gDONE = true;
+        free_sudoku(state);
         return;
       }
     }
+    free_sudoku(state);
     return;
   }
 
-/* try each son solution */
-#pragma omp parallel
-  {
-#pragma omp for
-    for (int i = 1; i <= gMOAS->n; i++) {
+  /* try each son solution */
+  for (int i = 1; i <= gMOAS->n; i++) {
 #pragma omp task untied
-      {
-        if (safe(state, gMOAS->empty_sq[id], i)) {
-          state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-          sudoku new_state = new_state_copy(state);
-          solve(id + 1, new_state);
-        }
+    {
+      if (safe(state, gMOAS->empty_sq[id], i)) {
+        state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
+        new_state = new_state_copy(state);
+        solve(id + 1, new_state);
       }
     }
+  }
 
 #pragma omp taskwait
-  }
   free_sudoku(state);
 }
 
@@ -256,7 +258,12 @@ int main(int argc, char const *argv[]) {
   begin = clock();
   // Solve the puzzle
   sudoku new_state = new_state_copy(gMOAS->to_solve);
-  solve(0, new_state);
+  omp_set_num_threads(THREADS);
+#pragma omp parallel
+  {
+#pragma omp single
+    solve(0, new_state);
+  }
   end = clock();
   if (gDONE) {
     print_grid(gMOAS->to_solve);
