@@ -201,9 +201,7 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 void solve(int id, sudoku state) {
-  sudoku new_state;
   if (gDONE) {
-    free_sudoku(state);
     return;
   }
 
@@ -214,7 +212,6 @@ void solve(int id, sudoku state) {
         state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
         copy_to_gMOAS(state);
         gDONE = true;
-        free_sudoku(state);
         return;
       }
     }
@@ -224,11 +221,11 @@ void solve(int id, sudoku state) {
 
   /* try each son solution */
   for (int i = 1; i <= gMOAS->n; i++) {
-#pragma omp task untied
+#pragma omp task firstprivate(i, id, state)
     {
       if (safe(state, gMOAS->empty_sq[id], i)) {
-        state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
-        new_state = new_state_copy(state);
+        sudoku new_state = new_state_copy(state);
+        new_state[gMOAS->empty_sq[id]->row][gMOAS->empty_sq[id]->col] = i;
         solve(id + 1, new_state);
       }
     }
