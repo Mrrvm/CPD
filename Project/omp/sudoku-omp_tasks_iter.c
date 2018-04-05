@@ -12,6 +12,8 @@
 #define EMPTY 0
 #define MIN(X, Y) ((X)<(Y)?(X):(Y))
 
+int idle = 0;
+
 typedef struct square_struct {
     int_fast8_t row;
     int_fast8_t col;
@@ -207,10 +209,21 @@ void print_branch(int level, int try) {
   printf("%d\n", try);
 }
 
+void print_line(int *v, int n) {
+  int i;
+
+  for (i = 0; i < n; i++) {
+    printf("%d, ", v[i]);
+  }
+
+  printf("\n");
+}
+
 void solve_task_sudoku (task_log *task_l) {
     task_log *new_task_l;
     int nplays, *v_plays;
     int ptr, base_ptr, aim_ptr;
+    int cnt = 0, cnt_max = 3, flag;
 
     if (gDONE) {
         free(task_l);
@@ -218,14 +231,26 @@ void solve_task_sudoku (task_log *task_l) {
         return;
     }
 
+    //#pragma omp atomic
+    #pragma omp critical
+    {
+      idle--;
+    }
+
+
     base_ptr = task_l->next_ptr;
 
     nplays = MIN((gMOAS->n_empty_sq - task_l->next_ptr - 1), task_l->steps);
     aim_ptr = base_ptr + nplays;
 
-    //printf("*** Task: b:%d s:%d a:%d ***\n", base_ptr, nplays, aim_ptr);
+    //printf("*** Task: b:%d s:%d a:%d INIT ***\n", base_ptr, nplays, aim_ptr);
 
     if (nplays == 0) {
+        #pragma omp critical
+        {
+          idle++;
+        }
+
         return;
     }
 
@@ -263,6 +288,41 @@ void solve_task_sudoku (task_log *task_l) {
             if (ptr < nplays) {
                 /* Branch */
 
+                if (cnt/MIN(ptr+base_ptr, 7) > cnt_max) {
+                  //#pragma omp atomic
+                  flag = idle;
+
+                  if (flag > 0) {
+                    if (cnt_max < 5000000) cnt_max *= 10;
+
+                    printf("HIT %d:  ", base_ptr+ptr);
+                    print_line(v_plays, ptr);
+
+                    /* Fork task */
+                    new_task_l = (task_log*) new_task_log ( task_l->state,
+                                                  base_ptr + ptr, gMOAS->n_empty_sq );
+
+                    /* Launch */
+                    #pragma omp task firstprivate(new_task_l)
+                    {
+                        solve_task_sudoku(new_task_l);
+                    }
+
+                    new_task_l = NULL;
+
+                    /* Backtrack */
+                    ptr--;
+
+                    task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = 0;
+                    continue;
+                  }
+                  /*else {
+                    printf("MISS\n");
+                  }*/
+
+                  cnt = 0;
+                }
+
                 v_plays[ptr] = 1;
             } else if (aim_ptr < (gMOAS->n_empty_sq - 1)) {
                 /* Reached aim level */
@@ -281,10 +341,16 @@ void solve_task_sudoku (task_log *task_l) {
             } else {
                 /* Has solved all :) */
 
-                gDONE = 1;
-                copy_to_gMOAS(task_l->state);
+                #pragma omp critical
+                {
+                  if (gDONE == 0) {
+                    gDONE = 1;
+                    copy_to_gMOAS(task_l->state);
 
-                free(task_l);
+                    free(task_l);
+                  }
+                }
+
                 return;
             }
         } else {
@@ -292,12 +358,21 @@ void solve_task_sudoku (task_log *task_l) {
 
             v_plays[ptr]++;
         }
+
+        cnt++;
     }
+
+    //printf("*** Task: b:%d s:%d a:%d DONE ***\n", base_ptr, nplays, aim_ptr);
 
     free(task_l);
     free(v_plays);
 
-    #pragma omp taskwait
+    #pragma omp critical
+    {
+      idle++;
+    }
+
+    //#pragma omp taskwait
 }
 
 int main(int argc, char const *argv[]) {
@@ -319,12 +394,19 @@ int main(int argc, char const *argv[]) {
   print_grid(gMOAS->to_solve);
 
   // Solve the puzzle
-  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 2);
+  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, gMOAS->n_empty_sq);
   double start = omp_get_wtime();
   #pragma omp parallel
   {
+    #pragma omp critical
+    {
+      idle++;
+    }
+
     #pragma omp single
     solve_task_sudoku(orig_task_l);
+
+    #pragma omp taskwait
 
   }
   double finish = omp_get_wtime();
