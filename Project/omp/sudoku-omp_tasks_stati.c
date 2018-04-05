@@ -216,32 +216,18 @@ void copy_to_gMOAS(uint_fast8_t *mask) {
 }
 
 void solve(int id, c_hack c_Hack) {
-    if (gDONE) {
-        return;
-    }
-
-    /* if in the last solve layer check if solved and start popping */
-    if (id == gMOAS->n_empty_sq - 1) {
-        for (int i = 1; i <= gMOAS->n; i++) {
-            if (safe(c_Hack.mask, id, i)) {
-                c_Hack.mask[id] = i;
-                copy_to_gMOAS(c_Hack.mask);
-                gDONE = true;
-                return;
-            }
-        }
-        return;
-    }
-
-    /* try each son solution */
-
     /* print_mask(c_Hack.mask); */
     for (int i = 1; i <= gMOAS->n; i++) {
         #pragma omp task firstprivate(i, id, c_Hack) untied
         {
             if (safe(c_Hack.mask, id, i)) {
                 c_Hack.mask[id] = i;
-                solve(id + 1, c_Hack);
+                if (id == gMOAS->n_empty_sq - 1) {
+                    copy_to_gMOAS(c_Hack.mask);
+                    gDONE = true;
+                } else {
+                    solve(id + 1, c_Hack);
+                }
             }
         }
     }

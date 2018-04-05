@@ -62,7 +62,6 @@ sudoku *init_sudoku(int box_size) {
 
 // Print grid
 void print_grid() {
-    printf("\e[1;1H\e[2J");
     for (int row = 0; row < to_solve->n; row++) {
         for (int col = 0; col < to_solve->n; col++)
             printf("%2d ", to_solve->grid[row][col]);
