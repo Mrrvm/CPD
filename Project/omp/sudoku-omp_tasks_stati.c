@@ -46,6 +46,10 @@ typedef struct moas_t {
     int_fast32_t n_empty_sq;
 } moas;
 
+typedef struct {
+    uint_fast8_t mask[ARRAY_SIZE];
+} c_hack;
+
 int gDONE;
 int thread_count = 4;
 moas *gMOAS;
@@ -141,21 +145,6 @@ bool safe(uint_fast8_t *mask, int id, int num) {
     int bx = (x / gMOAS->box_size) * gMOAS->box_size,
         by = (y / gMOAS->box_size) * gMOAS->box_size;
 
-    for (int j = 0; j < gMOAS->n; j++) {
-        // check row
-        if (y != j && num == gMOAS->to_solve[x * gMOAS->n + j])
-            return false;
-        // check column
-        if (x != j && num == gMOAS->to_solve[j * gMOAS->n + y])
-            return false;
-        // check box
-        int ox = j / gMOAS->box_size;
-        int oy = j % gMOAS->box_size;
-        if (gMOAS->empty_sqs[id] != ((bx + ox) * gMOAS->n + by + oy) &&
-                num == gMOAS->to_solve[(bx + ox) * gMOAS->n + by + oy])
-            return false;
-    }
-
     for (int i = 0; i < gMOAS->n_empty_sq; i++) {
         if (i == id) {
             continue;
@@ -176,22 +165,57 @@ bool safe(uint_fast8_t *mask, int id, int num) {
         if (bx == bxi && by == byi && num == mask[i])
             return false;
     }
+
+    for (int j = 0; j < gMOAS->n; j++) {
+        // check row
+        if (y != j && num == gMOAS->to_solve[x * gMOAS->n + j])
+            return false;
+        // check column
+        if (x != j && num == gMOAS->to_solve[j * gMOAS->n + y])
+            return false;
+        // check box
+        int ox = j / gMOAS->box_size;
+        int oy = j % gMOAS->box_size;
+        if (gMOAS->empty_sqs[id] != ((bx + ox) * gMOAS->n + by + oy) &&
+                num == gMOAS->to_solve[(bx + ox) * gMOAS->n + by + oy])
+            return false;
+    }
+
     return true;
 }
 
+void print_grid_with_mask(uint_fast8_t *mask) {
+    int iter = 0;
+    for (int i = 0; i < gMOAS->n; i++) {
+        for (int j = 0; j < gMOAS->n; j++) {
+            if (gMOAS->to_solve[i * gMOAS->n + j] == 0) {
+                printf("%2d ", mask[iter]);
+                iter++;
+            } else {
+                printf("%2d ", gMOAS->to_solve[i * gMOAS->n + j]);
+            }
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void print_mask(uint_fast8_t *mask) {
+    printf("Mask: ");
+    for (int i = 0; i < gMOAS->n_empty_sq; i++) {
+        printf("%d ", mask[i]);
+    }
+    printf("\n");
+}
+
 void copy_to_gMOAS(uint_fast8_t *mask) {
+    print_mask(mask);
     for (int i = 0; i < gMOAS->n_empty_sq; i++) {
         gMOAS->to_solve[gMOAS->empty_sqs[i]] = mask[i];
     }
 }
 
-sudoku new_state_copy(sudoku old_state) {
-    sudoku new_state = (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
-    memcpy(new_state, old_state, gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
-    return new_state;
-}
-
-void solve(int id, uint_fast8_t *mask) {
+void solve(int id, c_hack c_Hack) {
     if (gDONE) {
         return;
     }
@@ -199,9 +223,9 @@ void solve(int id, uint_fast8_t *mask) {
     /* if in the last solve layer check if solved and start popping */
     if (id == gMOAS->n_empty_sq - 1) {
         for (int i = 1; i <= gMOAS->n; i++) {
-            if (safe(mask, id, i)) {
-                mask[id] = i;
-                copy_to_gMOAS(mask);
+            if (safe(c_Hack.mask, id, i)) {
+                c_Hack.mask[id] = i;
+                copy_to_gMOAS(c_Hack.mask);
                 gDONE = true;
                 return;
             }
@@ -211,12 +235,13 @@ void solve(int id, uint_fast8_t *mask) {
 
     /* try each son solution */
 
+    /* print_mask(c_Hack.mask); */
     for (int i = 1; i <= gMOAS->n; i++) {
-        #pragma omp task firstprivate(i, id, mask) untied
+        #pragma omp task firstprivate(i, id, c_Hack) untied
         {
-            if (safe(mask, id, i)) {
-                mask[id] = i;
-                solve(id + 1, mask);
+            if (safe(c_Hack.mask, id, i)) {
+                c_Hack.mask[id] = i;
+                solve(id + 1, c_Hack);
             }
         }
     }
@@ -250,8 +275,8 @@ int main(int argc, char const *argv[]) {
     {
         #pragma omp single
         {
-            uint_fast8_t mask[ARRAY_SIZE] = {0};
-            solve(0, mask);
+            c_hack c_Hack = {0};
+            solve(0, c_Hack);
         }
     }
     double finish = omp_get_wtime();
