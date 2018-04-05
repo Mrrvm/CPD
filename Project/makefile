@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -march=native -std=gnu11 -Wall -Wextra -Werror -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
-CFLAGS_OPTIM = -O2 -Os
+CFLAGS_OPTIM = -O3 -Os
 CFLAGS_RELEASE = -march=native -std=gnu11 -O2 -Os
 BINARY = kuduro
 
