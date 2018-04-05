@@ -108,19 +108,6 @@ int read_file(const char *filename) {
     return 0;
 }
 
-// Free sudoku typedef
-void free_sudoku(sudoku to_free) {
-    free(to_free);
-}
-
-// Free global MOAS
-void free_gMOAS() {
-    free_sudoku(gMOAS->to_solve);
-    free(gMOAS->empty_sqs);
-
-    free(gMOAS);
-}
-
 // Print grid
 void print_grid(sudoku to_print) {
     for (int i = 0; i < gMOAS->n; i++) {
@@ -136,12 +123,9 @@ void print_grid(sudoku to_print) {
 bool safe(sudoku to_check, int id, int num) {
     int x = id / gMOAS->n, y = id % gMOAS->n;
 
-    int bx = (x / gMOAS->box_size) * gMOAS->box_size,
-        by = (y / gMOAS->box_size) * gMOAS->box_size;
-    int j, ox, oy;
-    for (j = 0; j < gMOAS->n; j++) {
-        ox = j / gMOAS->box_size;
-        oy = j % gMOAS->box_size;
+    for (int j = 0; j < gMOAS->n; j++) {
+        int ox = j / gMOAS->box_size;
+        int oy = j % gMOAS->box_size;
         // check row
         if (y != j && num == to_check[x * gMOAS->n + j])
             return false;
@@ -149,6 +133,8 @@ bool safe(sudoku to_check, int id, int num) {
         if (x != j && num == to_check[j * gMOAS->n + y])
             return false;
         // check box
+        int bx = (x / gMOAS->box_size) * gMOAS->box_size,
+            by = (y / gMOAS->box_size) * gMOAS->box_size;
         if (id != ((bx + ox) * gMOAS->n + by + oy) &&
                 num == to_check[(bx + ox) * gMOAS->n + by + oy])
             return false;
@@ -169,39 +155,28 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 void solve(int id, sudoku state) {
-    if (gDONE) {
+    if (gDONE == true) {
         return;
     }
-
-    /* if in the last solve layer check if solved and start popping */
-    if (id == gMOAS->n_empty_sq - 1) {
-        for (int i = 1; i <= gMOAS->n; i++) {
-            if (safe(state, gMOAS->empty_sqs[id], i)) {
-                state[gMOAS->empty_sqs[id]] = i;
-                copy_to_gMOAS(state);
-                gDONE = true;
-                return;
-            }
-        }
-        free_sudoku(state);
-        return;
-    }
-
+    sudoku new_state;
     /* try each son solution */
-
     for (int i = 1; i <= gMOAS->n; i++) {
-        #pragma omp task shared(state) firstprivate(i, id) untied
+        #pragma omp task shared(state) firstprivate(i, id) private(new_state) untied
         {
             if (safe(state, gMOAS->empty_sqs[id], i)) {
-                sudoku new_state = new_state_copy(state);
+                new_state = new_state_copy(state);
                 new_state[gMOAS->empty_sqs[id]] = i;
-                solve(id + 1, new_state);
+                if (id == gMOAS->n_empty_sq - 1) {
+                    copy_to_gMOAS(new_state);
+                    gDONE = true;
+                } else {
+                    solve(id + 1, new_state);
+                }
+                free(new_state);
             }
         }
     }
     #pragma omp taskwait
-    #pragma omp single nowait
-    free_sudoku(state);
 }
 
 int main(int argc, char const *argv[]) {
@@ -231,6 +206,8 @@ int main(int argc, char const *argv[]) {
         #pragma omp single
         solve(0, new_state);
     }
+
+    free(new_state);
     double finish = omp_get_wtime();
     if (gDONE) {
         puts("~~~ Output Sudoku ~~~");
@@ -242,7 +219,9 @@ int main(int argc, char const *argv[]) {
         // No solution
     };
 
-    free_gMOAS();
+    free(gMOAS->to_solve);
+    free(gMOAS->empty_sqs);
+    free(gMOAS);
     printf("Total Time %lfs\n", (double)(finish - start));
     return 0;
 }
