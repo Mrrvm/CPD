@@ -122,10 +122,10 @@ void print_grid(sudoku to_print) {
 // Check box, row and column for safety
 bool safe(sudoku to_check, int id, int num) {
     int x = id / gMOAS->n, y = id % gMOAS->n;
+    int bx = (x / gMOAS->box_size) * gMOAS->box_size,
+        by = (y / gMOAS->box_size) * gMOAS->box_size;
 
     for (int j = 0; j < gMOAS->n; j++) {
-        int ox = j / gMOAS->box_size;
-        int oy = j % gMOAS->box_size;
         // check row
         if (y != j && num == to_check[x * gMOAS->n + j])
             return false;
@@ -133,8 +133,8 @@ bool safe(sudoku to_check, int id, int num) {
         if (x != j && num == to_check[j * gMOAS->n + y])
             return false;
         // check box
-        int bx = (x / gMOAS->box_size) * gMOAS->box_size,
-            by = (y / gMOAS->box_size) * gMOAS->box_size;
+        int ox = j / gMOAS->box_size;
+        int oy = j % gMOAS->box_size;
         if (id != ((bx + ox) * gMOAS->n + by + oy) &&
                 num == to_check[(bx + ox) * gMOAS->n + by + oy])
             return false;
@@ -142,32 +142,24 @@ bool safe(sudoku to_check, int id, int num) {
     return true;
 }
 
-void copy_to_gMOAS(sudoku solved) {
-    for (int i = 0; i < gMOAS->n_empty_sq; i++) {
-        gMOAS->to_solve[gMOAS->empty_sqs[i]] = solved[gMOAS->empty_sqs[i]];
-    }
-}
-
-sudoku new_state_copy(sudoku old_state) {
-    sudoku new_state = (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
-    memcpy(new_state, old_state, gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
-    return new_state;
-}
-
 void solve(int id, sudoku state) {
     if (gDONE == true) {
         return;
     }
-    sudoku new_state;
     /* try each son solution */
     for (int i = 1; i <= gMOAS->n; i++) {
-        #pragma omp task shared(state) firstprivate(i, id) private(new_state) untied
+        #pragma omp task shared(state) firstprivate(i, id) untied
         {
             if (safe(state, gMOAS->empty_sqs[id], i)) {
-                new_state = new_state_copy(state);
+                sudoku new_state =
+                (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
+                memcpy(new_state, state, gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
                 new_state[gMOAS->empty_sqs[id]] = i;
                 if (id == gMOAS->n_empty_sq - 1) {
-                    copy_to_gMOAS(new_state);
+                    for (int j = 0; j < gMOAS->n_empty_sq; j++) {
+                        gMOAS->to_solve[gMOAS->empty_sqs[j]] =
+                        new_state[gMOAS->empty_sqs[j]];
+                    }
                     gDONE = true;
                 } else {
                     solve(id + 1, new_state);
@@ -198,7 +190,9 @@ int main(int argc, char const *argv[]) {
     print_grid(gMOAS->to_solve);
 
     // Solve the puzzle
-    sudoku new_state = new_state_copy(gMOAS->to_solve);
+    sudoku new_state = (sudoku)malloc(gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
+    memcpy(new_state, gMOAS->to_solve,
+           gMOAS->n * gMOAS->n * sizeof(uint_fast8_t));
     omp_set_num_threads(thread_count);
     double start = omp_get_wtime();
     #pragma omp parallel
