@@ -9,19 +9,25 @@ all: serial-recur serial-iter omp
 default: omp
 
 serial-recur: serial/sudoku-serial-recur.c
-	$(CC) serial/sudoku-serial-recur.c $(CFLAGS) -o $(BINARY)-serial-recur
+	$(CC) serial/sudoku-serial-recur.c $(CFLAGS) -o $(BINARY)-serial
 
 serial-iter: serial/sudoku-serial-iter.c
-	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial-iter
+	$(CC) serial/sudoku-serial-iter.c $(CFLAGS) -o $(BINARY)-serial
 
 tasks: omp/sudoku-omp_tasks.c
-	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp_tasks
+	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+
+masks: omp/sudoku-omp_masks.c
+	$(CC) omp/sudoku-omp_masks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+
+static: omp/sudoku-omp_tasks_stati.c
+	$(CC) omp/sudoku-omp_tasks_stati.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
 profile: omp/sudoku-omp_tasks.c
-	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-profile
+	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
 
 ompp: omp/sudoku-omp_tasks.c
-	kinst-ompp-papi gcc omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-profile
+	kinst-ompp-papi gcc omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
 
 omp: omp/
 	$(CC) omp/sudoku-omp_dfsv1.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv1
