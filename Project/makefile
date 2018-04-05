@@ -20,6 +20,9 @@ tasks: omp/sudoku-omp_tasks.c
 profile: omp/sudoku-omp_tasks.c
 	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-profile
 
+ompp: omp/sudoku-omp_tasks.c
+	kinst-ompp-papi gcc omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-profile
+
 omp: omp/
 	$(CC) omp/sudoku-omp_dfsv1.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv1
 	$(CC) omp/sudoku-omp_dfsv2.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv2
