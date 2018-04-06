@@ -15,7 +15,7 @@
 
 #ifndef SERIAL
 #define N_LEVELS 4
-int partition[] = {1, 1, 5, 30};
+int partition[] = {1, 1, 30, 5000};
 int steps[N_LEVELS];
 #else
 #define N_LEVELS 1
@@ -231,7 +231,7 @@ void print_line(int *v, int n) {
 }
 
 void solve_task_sudoku (task_log *task_l) {
-    task_log *new_task_l, *next_work = NULL;
+    task_log *new_task_l;
     int nplays, *v_plays;
     int ptr, base_ptr;
     int cnt = 0;
@@ -311,8 +311,10 @@ void solve_task_sudoku (task_log *task_l) {
                 new_task_l = (task_log*) new_task_log ( task_l->state,
                                               (base_ptr+nplays),  (task_l->level+1) );
 
-                new_task_l->next = next_work;
-                next_work = new_task_l;
+                #pragma omp task firstprivate(new_task_l)
+                {
+                    solve_task_sudoku(new_task_l);
+                }
                 
                 new_task_l = NULL;
 
@@ -333,16 +335,6 @@ void solve_task_sudoku (task_log *task_l) {
    // printf("Level: %d, Branchs:%d\n", task_l->level, cnt);
     free(task_l);
     free(v_plays);
-
-    new_task_l = next_work;
-    while (new_task_l != NULL) {
-        #pragma omp task firstprivate(new_task_l)
-        {
-            solve_task_sudoku(new_task_l);
-         }
-
-         new_task_l = new_task_l->next;
-    }
 
     return;
 }
