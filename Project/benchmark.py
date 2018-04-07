@@ -14,14 +14,13 @@ def timeout_handler(signum, frame):  # Custom signal handler
 
 
 def test(file, threads):
-    print("Handling", file, "with", threads, "threads")
     result = subprocess.run(
         [
             'bash', '-c',
             executable + " " + file + " " + str(threads) + ' | ' + ' tail -1'
         ],
         stdout=subprocess.PIPE).stdout.decode('utf-8')
-    print(result)
+    print(file, "-", threads, ":", result)
 
 
 signal.signal(signal.SIGALRM, timeout_handler)
@@ -32,10 +31,11 @@ li = [
 
 for thread_n in range(4):
     for filename in li:
-        signal.alarm(3 * 60)
+        signal.alarm(3 * 1)
         try:
             test(filename, thread_n + 1)
         except TimeoutException:
+            print(filename, "-", thread_n + 1, ":", "timed out")
             subprocess.run(["pkill", "kuduro-omp"])
             continue
         else:
