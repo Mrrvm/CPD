@@ -1,9 +1,10 @@
 #!/usr/bin/python
+import os.path
 import signal
 import subprocess
-import plotly.offline as offline
+
 import plotly.graph_objs as go
-import os.path
+import plotly.offline as offline
 
 executable = "./kuduro-omp"
 
@@ -34,6 +35,7 @@ files = [
 ]
 
 data = []
+thread_list = [2, 4, 6, 8]
 
 for filename in files:
     trace = go.Scatter(
@@ -44,14 +46,14 @@ for filename in files:
         name=os.path.basename(os.path.normpath(filename)),
         hoverinfo='text+name',
         line=dict(shape='spline'))
-    for thread_n in range(4):
+    for thread_n in thread_list:
         signal.alarm(3 * 60)
         try:
-            result = test(filename, thread_n + 1)
-            trace.x.append(thread_n + 1)
+            result = test(filename, thread_n)
+            trace.x.append(thread_n)
             trace.y.append(result)
         except TimeoutException:
-            print(filename, "-", thread_n + 1, ":", "timed out")
+            print(filename, "-", thread_n, ":", "timed out")
             subprocess.run(["pkill", "kuduro-omp"])
             continue
         else:
