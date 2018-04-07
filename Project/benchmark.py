@@ -1,6 +1,9 @@
 #!/usr/bin/python
 import signal
 import subprocess
+import plotly.offline as offline
+import plotly.graph_objs as go
+import os.path
 
 executable = "./kuduro-omp"
 
@@ -21,22 +24,66 @@ def test(file, threads):
         ],
         stdout=subprocess.PIPE).stdout.decode('utf-8')
     print(file, "-", threads, ":", result)
+    return result
 
 
 signal.signal(signal.SIGALRM, timeout_handler)
-li = [
+files = [
     "./testfiles/4x4.txt", "./testfiles/9x9.txt", "./testfiles/9x9-nosol.txt",
     "./testfiles/16x16.txt", "./testfiles/25x25.txt"
 ]
 
-for thread_n in range(4):
-    for filename in li:
-        signal.alarm(3 * 1)
+data = []
+
+for filename in files:
+    trace = go.Scatter(
+        x=[],
+        y=[],
+        dx=1,
+        mode='lines+markers',
+        name=os.path.basename(os.path.normpath(filename)),
+        hoverinfo='text+name',
+        line=dict(shape='spline'))
+    for thread_n in range(4):
+        signal.alarm(3 * 60)
         try:
-            test(filename, thread_n + 1)
+            result = test(filename, thread_n + 1)
+            trace.x.append(thread_n + 1)
+            trace.y.append(result)
         except TimeoutException:
             print(filename, "-", thread_n + 1, ":", "timed out")
             subprocess.run(["pkill", "kuduro-omp"])
             continue
         else:
             signal.alarm(0)
+    data.append(trace)
+
+layout = go.Layout(
+    xaxis=dict(
+        title='N Threads',
+        titlefont=dict(
+            family='Noto Sans, sans-serif', size=18, color='lightgrey'),
+        tick0=1,
+        dtick=1,
+        autotick=False,
+        autorange=True,
+        showgrid=True,
+        zeroline=True,
+        showline=True,
+        ticks='',
+        showticklabels=True),
+    yaxis=dict(
+        title='Execution Time (s)',
+        titlefont=dict(
+            family='Noto Sans, sans-serif', size=18, color='lightgrey'),
+        showticklabels=True,
+        autorange=True,
+        showgrid=True,
+        zeroline=True,
+        showline=True,
+        autotick=True,
+        ticks=''))
+
+fig = dict(data=data, layout=layout)
+
+offline.plot(fig, image='png')
