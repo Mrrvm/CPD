@@ -167,7 +167,7 @@ void print_grid(sudoku to_print) {
 
 // Check box, row and column for safety
 bool safe(sudoku to_check, square *to_test, uint_fast8_t num,
-          uint_fast8_t row_start, uint_fast8_t col_start) {
+          uint_fast8_t *row_start, uint_fast8_t *col_start) {
 
     for (uint_fast8_t i = 0; i < gMOAS->n; i++) {
         if (to_check[i][to_test->col] == num || to_check[to_test->row][i] == num) {
@@ -177,7 +177,7 @@ bool safe(sudoku to_check, square *to_test, uint_fast8_t num,
 
     for (uint_fast8_t i = 0; i < gMOAS->box_size; i++)
         for (uint_fast8_t j = 0; j < gMOAS->box_size; j++)
-            if (to_check[i + row_start][j + col_start] == num) {
+            if (to_check[i + *row_start][j + *col_start] == num) {
                 return false;
             }
 
@@ -232,7 +232,8 @@ void print_line(int *v, int n) {
 
 void solve_task_sudoku(task_log *task_l) {
     task_log *new_task_l;
-    int_fast32_t nplays, *v_plays;
+    int_fast32_t nplays;
+    uint_fast8_t *v_plays;
     int_fast32_t ptr, base_ptr;
     int_fast32_t cnt = 0;
 
@@ -248,7 +249,7 @@ void solve_task_sudoku(task_log *task_l) {
 
     // printf("*** Task: b:%d s:%d a:%d INIT ***\n", base_ptr, nplays, aim_ptr);
 
-    v_plays = (int_fast32_t *)malloc(nplays * sizeof(int_fast32_t));
+    v_plays = (uint_fast8_t *)malloc(nplays * sizeof(uint_fast8_t));
 
     ptr = 0;
     v_plays[0] = 1;
@@ -258,7 +259,6 @@ void solve_task_sudoku(task_log *task_l) {
 
         if (gDONE) {
             free(task_l);
-
             return;
         }
 
@@ -286,7 +286,7 @@ void solve_task_sudoku(task_log *task_l) {
             gMOAS->empty_sq[ptr + base_ptr]->col % gMOAS->box_size;
         /* Check if next play is valid. */
         if (safe(task_l->state, gMOAS->empty_sq[ptr + base_ptr], v_plays[ptr],
-                 row_start, col_start)) {
+                 &row_start, &col_start)) {
 
             // print_branch(ptr+base_ptr, v_plays[ptr]);
 
