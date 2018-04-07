@@ -352,7 +352,6 @@ void create_steps() {
     }
 
     left = gMOAS->n_empty_sq;
-    ;
 
     for (i = 0; i < N_LEVELS - 1; i++) {
         steps[i] = (int_fast32_t)(gMOAS->n_empty_sq * partition[i] / sum) + 1;
