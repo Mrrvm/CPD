@@ -20,6 +20,9 @@ tasks: omp/sudoku-omp_tasks.c
 reborn: omp/sudoku-omp-reborn.c
 	$(CC) omp/sudoku-omp-reborn.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
+adapta: omp/sudoku-omp-adapta.c
+	$(CC) omp/sudoku-omp-adapta.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+
 masks: omp/sudoku-omp_masks.c
 	$(CC) omp/sudoku-omp_masks.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 

@@ -10,7 +10,7 @@
 
 #define N_ARGS 2
 #define EMPTY 0
-#define MIN(X, Y) ((X)<(Y)?(X):(Y))
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
 #define THRES 10
 
@@ -192,7 +192,7 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 task_log *new_task_log(sudoku old_state, int next_ptr) {
-    task_log *new = (task_log*) malloc(sizeof(task_log));
+    task_log *new = (task_log *)malloc(sizeof(task_log));
 
     new->state = new_state_copy(old_state);
     new->next_ptr = next_ptr;
@@ -201,24 +201,25 @@ task_log *new_task_log(sudoku old_state, int next_ptr) {
 }
 
 void print_branch(int level, int try) {
-  int i;
+    int i;
 
-  for(i = 0; i < level; i++) printf("  ");
+    for (i = 0; i < level; i++)
+        printf("  ");
 
-  printf("%d\n", try);
+    printf("%d\n", try);
 }
 
 void print_line(int *v, int n) {
-  int i;
+    int i;
 
-  for (i = 0; i < n; i++) {
-    printf("%d, ", v[i]);
-  }
+    for (i = 0; i < n; i++) {
+        printf("%d, ", v[i]);
+    }
 
-  printf("\n");
+    printf("\n");
 }
 
-void solve_task_sudoku (task_log *task_l) {
+void solve_task_sudoku(task_log *task_l) {
     task_log *task_top, *new_task_l;
     int nplays, *v_plays;
     int ptr, base_ptr;
@@ -234,11 +235,11 @@ void solve_task_sudoku (task_log *task_l) {
 
     nplays = gMOAS->n_empty_sq - base_ptr;
 
-    //printf("*** Task: b:%d INIT ***\n", base_ptr);
+    // printf("*** Task: b:%d INIT ***\n", base_ptr);
 
-    v_plays = (int *) malloc(nplays * sizeof(int));
+    v_plays = (int *)malloc(nplays * sizeof(int));
 
-    task_top = (task_log*) new_task_log(task_l->state, base_ptr);
+    task_top = (task_log *)new_task_log(task_l->state, base_ptr);
 
     top = ptr = 0;
     v_plays[0] = 1;
@@ -263,71 +264,81 @@ void solve_task_sudoku (task_log *task_l) {
 
             /* Backtrack */
             ptr--;
-            task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = 0;
+            task_l->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+            [gMOAS->empty_sq[ptr + base_ptr]->col] = 0;
 
             continue;
         }
 
         /* Fork task workload if idle threads are detected. */
-        if ((base_ptr+top) < THRES && idle > 0 && top < ptr && top < (nplays - 1)) {
+        if ((base_ptr + top) < THRES && idle > 0 && top < ptr &&
+                top < (nplays - 1)) {
 
-            if (safe(task_top->state, gMOAS->empty_sq[top+base_ptr], v_plays[top])) {
+            if (safe(task_top->state, gMOAS->empty_sq[top + base_ptr],
+                     v_plays[top])) {
 
                 if (v_plays[top] > gMOAS->n) {
-                    /* Branch top down in the branch currenlty being explored in this task. */
+                    /* Branch top down in the branch currenlty being explored in this
+                     * task. */
 
-                    task_top->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = 
-                        task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col];
-                    
+                    task_top->state[gMOAS->empty_sq[top + base_ptr]->row]
+                    [gMOAS->empty_sq[top + base_ptr]->col] =
+                        task_l->state[gMOAS->empty_sq[top + base_ptr]->row]
+                        [gMOAS->empty_sq[top + base_ptr]->col];
+
                     top++;
                 } else {
 
                     #pragma omp critical
-                    {
-                        idle--;
-                    }
+                    { idle--; }
 
                     printf("Launch sub-task, level %d, option %d\n", top, v_plays[top]);
-                                
-                    /* Create new task */
-                    new_task_l = (task_log*) new_task_log ( task_top->state,
-                                                (base_ptr+top+1) );
 
-                    new_task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = v_plays[top];
+                    /* Create new task */
+                    new_task_l =
+                        (task_log *)new_task_log(task_top->state, (base_ptr + top + 1));
+
+                    new_task_l->state[gMOAS->empty_sq[top + base_ptr]->row]
+                    [gMOAS->empty_sq[top + base_ptr]->col] =
+                        v_plays[top];
 
                     #pragma omp task firstprivate(new_task_l)
                     {
                         solve_task_sudoku(new_task_l);
                     }
-                    
+
                     new_task_l = NULL;
-                    
+
                     v_plays[top]++; /* always to next */
 
                     if (v_plays[top] > gMOAS->n) {
-                        /* Branch top down in the branch currenlty being explored in this task. */
+                        /* Branch top down in the branch currenlty being explored in this
+                         * task. */
 
-                        task_top->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = 
-                            task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col];
-                        
+                        task_top->state[gMOAS->empty_sq[top + base_ptr]->row]
+                        [gMOAS->empty_sq[top + base_ptr]->col] =
+                            task_l->state[gMOAS->empty_sq[top + base_ptr]->row]
+                            [gMOAS->empty_sq[top + base_ptr]->col];
+
                         top++;
                     }
                 }
             } else {
                 v_plays[top]++;
             }
-            
         }
 
         /* Check if next play is valid. */
-        if (safe(task_l->state, gMOAS->empty_sq[ptr+base_ptr], v_plays[ptr])) {
-            //print_branch(ptr+base_ptr, v_plays[ptr]);
+        if (safe(task_l->state, gMOAS->empty_sq[ptr + base_ptr], v_plays[ptr])) {
+            // print_branch(ptr+base_ptr, v_plays[ptr]);
 
-            task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
+            task_l->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+            [gMOAS->empty_sq[ptr + base_ptr]->col] = v_plays[ptr];
             v_plays[ptr]++; /* always to next */
 
             if (v_plays[ptr] > gMOAS->n && ptr == top) {
-                task_top->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
+                task_top->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+                [gMOAS->empty_sq[ptr + base_ptr]->col] = v_plays[ptr];
 
                 top++;
             }
@@ -342,8 +353,8 @@ void solve_task_sudoku (task_log *task_l) {
 
                 #pragma omp critical
                 {
-                   if (gDONE == 0) {
-                         gDONE = 1;
+                    if (gDONE == 0) {
+                        gDONE = 1;
                         copy_to_gMOAS(task_l->state);
                     }
                 }
@@ -357,14 +368,14 @@ void solve_task_sudoku (task_log *task_l) {
         }
     }
 
-    //printf("*** Task: b:%d s:%d a:%d DONE ***\n", base_ptr, nplays, aim_ptr);
+    // printf("*** Task: b:%d s:%d a:%d DONE ***\n", base_ptr, nplays, aim_ptr);
 
-   // printf("Level: %d, Branchs:%d\n", task_l->level, cnt);
+    // printf("Level: %d, Branchs:%d\n", task_l->level, cnt);
     free(task_l);
     free(task_top);
     free(v_plays);
 
-    //printf("*** Task: b:%d DONE ***\n", base_ptr);
+    // printf("*** Task: b:%d DONE ***\n", base_ptr);
 
     #pragma omp critical
     {
@@ -376,11 +387,14 @@ void solve_task_sudoku (task_log *task_l) {
 
 int main(int argc, char const *argv[]) {
     task_log *orig_task_l;
+    int thread_count = 4;
 
-    if (argc != N_ARGS) {
+    if (argc < N_ARGS) {
         char error[64];
         sprintf(error, "Usage: %s filename\n", argv[0]);
         print_error(error);
+    } else if (argc == 3) {
+        thread_count = atoi(argv[2]);
     }
 
     if (read_file(argv[1]) != 0) {
@@ -389,6 +403,7 @@ int main(int argc, char const *argv[]) {
         print_error(error);
     }
 
+    omp_set_num_threads(thread_count);
     puts("~~~ Input Sudoku ~~~");
     print_grid(gMOAS->to_solve);
 
@@ -400,9 +415,7 @@ int main(int argc, char const *argv[]) {
     #pragma omp parallel
     {
         #pragma omp critical
-        {
-            idle++;
-        }
+        { idle++; }
 
         #pragma omp single
         solve_task_sudoku(orig_task_l);
@@ -421,6 +434,6 @@ int main(int argc, char const *argv[]) {
     };
 
     free_gMOAS();
-    printf("Total Time %lfs\n", (double)(finish - start));
+    printf("%lf\n", (finish - start));
     return 0;
 }
