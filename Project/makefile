@@ -32,13 +32,8 @@ profile: omp/sudoku-omp_tasks.c
 ompp: omp/sudoku-omp_tasks.c
 	kinst-ompp-papi gcc omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
 
-omp: omp/
-	$(CC) omp/sudoku-omp_dfsv1.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv1
-	$(CC) omp/sudoku-omp_dfsv2.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv2
-	$(CC) omp/sudoku-omp_dfsv3.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_dfsv3
-	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_tasks
-	$(CC) omp/sudoku-omp_tasks_iter.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_tasks_iter
-	$(CC) omp/sudoku-omp_subqueues.c -fopenmp $(CFLAGS) -o $(BINARY)-omp_subqueries
+BPsubqueues: omp/sudoku-omp_BPsubqueues.c
+	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
 clean:
 	-@rm $(BINARY)*

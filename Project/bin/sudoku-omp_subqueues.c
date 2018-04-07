@@ -220,15 +220,15 @@ int solve() {
   q = init_queue();
 
   // Initialize queue
-#pragma omp parallel
+  #pragma omp parallel
   {
-#pragma omp for nowait
+    #pragma omp for nowait
     for (i = 1; i <= to_solve->n; i++) {
       if (safe_by_square(to_solve, get_square_by_ptr(0), i)) {
         node *new_node;
         new_node = create_node(to_solve, 0);
         set_by_ptr(new_node->plays, 0, i);
-#pragma omp critical
+        #pragma omp critical
         enqueue(new_node, q);
       }
     }
@@ -241,9 +241,9 @@ int solve() {
     // print_queue(q);
 
     // Work on the queue
-#pragma omp parallel
+  #pragma omp parallel
   {
-#pragma omp for nowait
+    #pragma omp for nowait
     for (j = 0; j <= q->size; ++j) {
       // WARNING
       // Must check the q->size from time to time
@@ -253,7 +253,7 @@ int solve() {
 
         node *q_node = NULL;
         // Get one node from queue
-#pragma omp critical
+        #pragma omp critical
         { q_node = dequeue(q); }
 
         if (q_node != NULL) {
@@ -262,8 +262,7 @@ int solve() {
           node *new_node = NULL;
           // Initialize private queue
           for (i = 1; i <= to_solve->n; ++i) {
-            if (safe_by_square(q_node->plays,
-                               get_square_by_ptr(q_node->next_ptr), i)) {
+            if (safe_by_square(q_node->plays, get_square_by_ptr(q_node->next_ptr), i)) {
               new_node = create_node(q_node->plays, q_node->next_ptr);
               set_by_ptr(new_node->plays, q_node->next_ptr, i);
               enqueue(new_node, priv_q);
@@ -271,25 +270,22 @@ int solve() {
           }
 
           while (priv_q->size != 0) {
-
             if (!finish) { // This should be optimized
 
               priv_q_node = dequeue(priv_q);
 
               for (i = 1; i <= to_solve->n; ++i) {
-                if (safe_by_square(priv_q_node->plays,
-                                   get_square_by_ptr(priv_q_node->next_ptr),
-                                   i)) {
+                if (safe_by_square(priv_q_node->plays, get_square_by_ptr(priv_q_node->next_ptr), i)) {
 
                   if ((priv_q_node->next_ptr) + 1 == to_solve->n_plays) {
-// Solution was found
-#pragma omp atomic
+                    // Solution was found
+                    #pragma omp atomic
                     finish++;
                     set_by_ptr(priv_q_node->plays, priv_q_node->next_ptr, i);
                     cpy_final_plays(priv_q_node->plays);
+                    printf("HERER\n\n\n\n\n\n");
                   } else {
-                    new_node =
-                        create_node(priv_q_node->plays, priv_q_node->next_ptr);
+                    new_node = create_node(priv_q_node->plays, priv_q_node->next_ptr);
                     set_by_ptr(new_node->plays, priv_q_node->next_ptr, i);
                     enqueue(new_node, priv_q);
                     new_node = NULL;
