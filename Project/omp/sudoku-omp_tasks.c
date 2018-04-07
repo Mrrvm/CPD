@@ -219,6 +219,6 @@ int main(int argc, char const *argv[]) {
     free(gMOAS->to_solve);
     free(gMOAS->empty_sqs);
     free(gMOAS);
-    printf("Total Time %lfs\n", (double)(finish - start));
+    printf("%lf\n", (finish - start));
     return 0;
 }
