@@ -166,9 +166,8 @@ void print_grid(sudoku to_print) {
 }
 
 // Check box, row and column for safety
-bool safe(sudoku to_check, square *to_test, uint_fast8_t num) {
-    uint_fast8_t row_start = to_test->row - to_test->row % gMOAS->box_size;
-    uint_fast8_t col_start = to_test->col - to_test->col % gMOAS->box_size;
+bool safe(sudoku to_check, square *to_test, uint_fast8_t num,
+          uint_fast8_t row_start, uint_fast8_t col_start) {
 
     for (uint_fast8_t i = 0; i < gMOAS->n; i++) {
         if (to_check[i][to_test->col] == num || to_check[to_test->row][i] == num) {
@@ -194,7 +193,7 @@ void copy_to_gMOAS(sudoku solved) {
 
 sudoku new_state_copy(sudoku old_state) {
     sudoku new_state = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
-    for (int i = 0; i < gMOAS->n; i++) {
+    for (int_fast32_t i = 0; i < gMOAS->n; i++) {
         new_state[i] = (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
         memcpy(new_state[i], old_state[i], gMOAS->n * sizeof(uint_fast8_t));
     }
@@ -279,8 +278,15 @@ void solve_task_sudoku(task_log *task_l) {
             continue;
         }
 
+        uint_fast8_t row_start =
+            gMOAS->empty_sq[ptr + base_ptr]->row -
+            gMOAS->empty_sq[ptr + base_ptr]->row % gMOAS->box_size;
+        uint_fast8_t col_start =
+            gMOAS->empty_sq[ptr + base_ptr]->col -
+            gMOAS->empty_sq[ptr + base_ptr]->col % gMOAS->box_size;
         /* Check if next play is valid. */
-        if (safe(task_l->state, gMOAS->empty_sq[ptr + base_ptr], v_plays[ptr])) {
+        if (safe(task_l->state, gMOAS->empty_sq[ptr + base_ptr], v_plays[ptr],
+                 row_start, col_start)) {
 
             // print_branch(ptr+base_ptr, v_plays[ptr]);
 
