@@ -376,11 +376,14 @@ void create_steps() {
 
 int main(int argc, char const *argv[]) {
     task_log *orig_task_l;
+    int thread_count = 4;
 
-    if (argc != N_ARGS) {
+    if (argc < N_ARGS) {
         char error[64];
         sprintf(error, "Usage: %s filename\n", argv[0]);
         print_error(error);
+    } else if (argc == 3) {
+        thread_count = atoi(argv[2]);
     }
 
     if (read_file(argv[1]) != 0) {
@@ -389,6 +392,7 @@ int main(int argc, char const *argv[]) {
         print_error(error);
     }
 
+    omp_set_num_threads(thread_count);
     puts("~~~ Input Sudoku ~~~");
     print_grid(gMOAS->to_solve);
 
@@ -416,6 +420,6 @@ int main(int argc, char const *argv[]) {
     };
 
     free_gMOAS();
-    printf("Total Time %lfs\n", (finish - start));
+    printf("%lf\n", (finish - start));
     return 0;
 }

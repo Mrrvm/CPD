@@ -59,10 +59,11 @@ for filename in files:
     data.append(trace)
 
 layout = go.Layout(
+    title='Kuduro, the Sudoku solver',
     xaxis=dict(
-        title='N Threads',
+        title='Thread Count',
         titlefont=dict(
-            family='Noto Sans, sans-serif', size=18, color='lightgrey'),
+            family='Noto Sans, sans-serif', size=16, color='lightgrey'),
         tick0=1,
         dtick=1,
         autotick=False,
@@ -75,7 +76,7 @@ layout = go.Layout(
     yaxis=dict(
         title='Execution Time (s)',
         titlefont=dict(
-            family='Noto Sans, sans-serif', size=18, color='lightgrey'),
+            family='Noto Sans, sans-serif', size=16, color='lightgrey'),
         showticklabels=True,
         autorange=True,
         showgrid=True,
