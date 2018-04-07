@@ -56,7 +56,8 @@ for filename in files:
             continue
         else:
             signal.alarm(0)
-    data.append(trace)
+    if len(trace.x) > 1:
+        data.append(trace)
 
 layout = go.Layout(
     title='Kuduro, the Sudoku solver',
