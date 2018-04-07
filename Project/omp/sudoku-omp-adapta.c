@@ -271,29 +271,7 @@ void solve_task_sudoku (task_log *task_l) {
         /* Fork task workload if idle threads are detected. */
         if ((base_ptr+top) < THRES && idle > 0 && top < ptr && top < (nplays - 1)) {
 
-            if (safe(task_top->state, gMOAS->empty_sq[top+base_ptr], v_plays[ptr])) {
-
-                #pragma omp critical
-                {
-                    idle--;
-                }
-
-                 printf("Launch sub-task, level %d, option %d\n", top, v_plays[top]);
-                               
-                /* Create new task */
-                new_task_l = (task_log*) new_task_log ( task_top->state,
-                                              (base_ptr+top+1) );
-
-                new_task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = v_plays[top];
-
-                #pragma omp task firstprivate(new_task_l)
-                {
-                    solve_task_sudoku(new_task_l);
-                }
-                
-                new_task_l = NULL;
-                
-                v_plays[top]++; /* always to next */
+            if (safe(task_top->state, gMOAS->empty_sq[top+base_ptr], v_plays[top])) {
 
                 if (v_plays[top] > gMOAS->n) {
                     /* Branch top down in the branch currenlty being explored in this task. */
@@ -302,6 +280,38 @@ void solve_task_sudoku (task_log *task_l) {
                         task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col];
                     
                     top++;
+                } else {
+
+                    #pragma omp critical
+                    {
+                        idle--;
+                    }
+
+                    printf("Launch sub-task, level %d, option %d\n", top, v_plays[top]);
+                                
+                    /* Create new task */
+                    new_task_l = (task_log*) new_task_log ( task_top->state,
+                                                (base_ptr+top+1) );
+
+                    new_task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = v_plays[top];
+
+                    #pragma omp task firstprivate(new_task_l)
+                    {
+                        solve_task_sudoku(new_task_l);
+                    }
+                    
+                    new_task_l = NULL;
+                    
+                    v_plays[top]++; /* always to next */
+
+                    if (v_plays[top] > gMOAS->n) {
+                        /* Branch top down in the branch currenlty being explored in this task. */
+
+                        task_top->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col] = 
+                            task_l->state[gMOAS->empty_sq[top+base_ptr]->row][gMOAS->empty_sq[top+base_ptr]->col];
+                        
+                        top++;
+                    }
                 }
             } else {
                 v_plays[top]++;
