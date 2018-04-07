@@ -10,9 +10,18 @@
 
 #define N_ARGS 2
 #define EMPTY 0
-#define MIN(X, Y) ((X)<(Y)?(X):(Y))
+#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
+//#define SERIAL
 
-int idle = 0;
+#ifndef SERIAL
+#define N_LEVELS 4
+int partition[] = {1, 1, 30, 5000};
+int steps[N_LEVELS];
+#else
+#define N_LEVELS 1
+int partition[] = {1};
+int steps[N_LEVELS];
+#endif
 
 typedef struct square_struct {
     int_fast8_t row;
@@ -27,14 +36,15 @@ typedef struct moas_t {
     square **empty_sq;
     sudoku to_solve;
     int_fast32_t n;
-    int_fast32_t box_size;
+    int_fast8_t box_size;
     int_fast32_t n_empty_sq;
 } moas;
 
 typedef struct task_log_t {
     sudoku state;
     int next_ptr;
-    int steps;
+    int level;
+    struct task_log_t *next;
 } task_log;
 
 int gDONE;
@@ -156,19 +166,18 @@ void print_grid(sudoku to_print) {
 }
 
 // Check box, row and column for safety
-bool safe(sudoku to_check, square *to_test, int num) {
-    uint_fast8_t row_start = to_test->row - to_test->row % gMOAS->box_size;
-    uint_fast8_t col_start = to_test->col - to_test->col % gMOAS->box_size;
+bool safe(sudoku to_check, square *to_test, uint_fast8_t num,
+          uint_fast8_t *row_start, uint_fast8_t *col_start) {
 
-    for (int i = 0; i < gMOAS->n; i++) {
+    for (uint_fast8_t i = 0; i < gMOAS->n; i++) {
         if (to_check[i][to_test->col] == num || to_check[to_test->row][i] == num) {
             return false;
         }
     }
 
-    for (int i = 0; i < gMOAS->box_size; i++)
-        for (int j = 0; j < gMOAS->box_size; j++)
-            if (to_check[i + row_start][j + col_start] == num) {
+    for (uint_fast8_t i = 0; i < gMOAS->box_size; i++)
+        for (uint_fast8_t j = 0; j < gMOAS->box_size; j++)
+            if (to_check[i + *row_start][j + *col_start] == num) {
                 return false;
             }
 
@@ -184,46 +193,49 @@ void copy_to_gMOAS(sudoku solved) {
 
 sudoku new_state_copy(sudoku old_state) {
     sudoku new_state = (sudoku)malloc(gMOAS->n * sizeof(uint_fast8_t *));
-    for (int i = 0; i < gMOAS->n; i++) {
+    for (int_fast32_t i = 0; i < gMOAS->n; i++) {
         new_state[i] = (uint_fast8_t *)malloc(gMOAS->n * sizeof(uint_fast8_t));
         memcpy(new_state[i], old_state[i], gMOAS->n * sizeof(uint_fast8_t));
     }
     return new_state;
 }
 
-task_log *new_task_log(sudoku old_state, int next_ptr, int steps) {
-    task_log *new = (task_log*) malloc(sizeof(task_log));
+task_log *new_task_log(sudoku old_state, int next_ptr, int level) {
+    task_log *new = (task_log *)malloc(sizeof(task_log));
 
     new->state = new_state_copy(old_state);
     new->next_ptr = next_ptr;
-    new->steps = steps;
+    new->level = level;
+    new->next = NULL;
 
     return new;
 }
 
 void print_branch(int level, int try) {
-  int i;
+    int i;
 
-  for(i = 0; i < level; i++) printf("  ");
+    for (i = 0; i < level; i++)
+        printf("  ");
 
-  printf("%d\n", try);
+    printf("%d\n", try);
 }
 
 void print_line(int *v, int n) {
-  int i;
+    int i;
 
-  for (i = 0; i < n; i++) {
-    printf("%d, ", v[i]);
-  }
+    for (i = 0; i < n; i++) {
+        printf("%d, ", v[i]);
+    }
 
-  printf("\n");
+    printf("\n");
 }
 
-void solve_task_sudoku (task_log *task_l) {
+void solve_task_sudoku(task_log *task_l) {
     task_log *new_task_l;
-    int nplays, *v_plays;
-    int ptr, base_ptr, aim_ptr;
-    int cnt = 0, cnt_max = 3, flag;
+    int_fast32_t nplays;
+    uint_fast8_t *v_plays;
+    int_fast32_t ptr, base_ptr;
+    int_fast32_t cnt = 0;
 
     if (gDONE) {
         free(task_l);
@@ -231,36 +243,24 @@ void solve_task_sudoku (task_log *task_l) {
         return;
     }
 
-    //#pragma omp atomic
-    #pragma omp critical
-    {
-      idle--;
-    }
-
-
     base_ptr = task_l->next_ptr;
 
-    nplays = MIN((gMOAS->n_empty_sq - task_l->next_ptr - 1), task_l->steps);
-    aim_ptr = base_ptr + nplays;
+    nplays = steps[task_l->level];
 
-    //printf("*** Task: b:%d s:%d a:%d INIT ***\n", base_ptr, nplays, aim_ptr);
+    // printf("*** Task: b:%d s:%d a:%d INIT ***\n", base_ptr, nplays, aim_ptr);
 
-    if (nplays == 0) {
-        #pragma omp critical
-        {
-          idle++;
-        }
-
-        return;
-    }
-
-    v_plays = (int *) malloc(nplays * sizeof(int));
+    v_plays = (uint_fast8_t *)malloc(nplays * sizeof(uint_fast8_t));
 
     ptr = 0;
     v_plays[0] = 1;
 
     while (1) {
         /* This square is empty. */
+
+        if (gDONE) {
+            free(task_l);
+            return;
+        }
 
         /* Check if branch options are emptied. */
         if (v_plays[ptr] > gMOAS->n) {
@@ -269,158 +269,153 @@ void solve_task_sudoku (task_log *task_l) {
 
                 break;
             }
+
             /* Backtrack */
             ptr--;
+            task_l->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+            [gMOAS->empty_sq[ptr + base_ptr]->col] = 0;
 
-            task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = 0;
             continue;
         }
 
+        uint_fast8_t row_start =
+            gMOAS->empty_sq[ptr + base_ptr]->row -
+            gMOAS->empty_sq[ptr + base_ptr]->row % gMOAS->box_size;
+        uint_fast8_t col_start =
+            gMOAS->empty_sq[ptr + base_ptr]->col -
+            gMOAS->empty_sq[ptr + base_ptr]->col % gMOAS->box_size;
         /* Check if next play is valid. */
-        if (safe(task_l->state, gMOAS->empty_sq[ptr+base_ptr], v_plays[ptr])) {
+        if (safe(task_l->state, gMOAS->empty_sq[ptr + base_ptr], v_plays[ptr],
+                 &row_start, &col_start)) {
 
-            //print_branch(ptr+base_ptr, v_plays[ptr]);
+            // print_branch(ptr+base_ptr, v_plays[ptr]);
 
-            task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = v_plays[ptr];
+            task_l->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+            [gMOAS->empty_sq[ptr + base_ptr]->col] = v_plays[ptr];
             v_plays[ptr]++; /* always to next */
 
             ptr++;
             if (ptr < nplays) {
-                /* Branch */
-
-                if (cnt/MIN(ptr+base_ptr, 7) > cnt_max) {
-                  //#pragma omp atomic
-                  flag = idle;
-
-                  if (flag > 0) {
-                    if (cnt_max < 5000000) cnt_max *= 10;
-
-                    printf("HIT %d:  ", base_ptr+ptr);
-                    print_line(v_plays, ptr);
-
-                    /* Fork task */
-                    new_task_l = (task_log*) new_task_log ( task_l->state,
-                                                  base_ptr + ptr, gMOAS->n_empty_sq );
-
-                    /* Launch */
-                    #pragma omp task firstprivate(new_task_l)
-                    {
-                        solve_task_sudoku(new_task_l);
-                    }
-
-                    new_task_l = NULL;
-
-                    /* Backtrack */
-                    ptr--;
-
-                    task_l->state[gMOAS->empty_sq[ptr+base_ptr]->row][gMOAS->empty_sq[ptr+base_ptr]->col] = 0;
-                    continue;
-                  }
-                  /*else {
-                    printf("MISS\n");
-                  }*/
-
-                  cnt = 0;
-                }
+                /* Branch down */
 
                 v_plays[ptr] = 1;
-            } else if (aim_ptr < (gMOAS->n_empty_sq - 1)) {
-                /* Reached aim level */
+            } else if (task_l->level == N_LEVELS - 1) {
+                /* Has solved all :) */
 
+                #pragma omp critical
+                {
+                    if (gDONE == 0) {
+                        gDONE = 1;
+                        copy_to_gMOAS(task_l->state);
+                    }
+                }
+
+                free(task_l);
+                return;
+            } else {
+                /* Fork */
+
+                cnt++;
                 /* Create new task */
-                new_task_l = (task_log*) new_task_log ( task_l->state,
-                                              aim_ptr, task_l->steps*task_l->steps );
+                new_task_l = (task_log *)new_task_log(
+                                 task_l->state, (base_ptr + nplays), (task_l->level + 1));
 
-                /* Launch */
                 #pragma omp task firstprivate(new_task_l)
                 {
                     solve_task_sudoku(new_task_l);
                 }
 
                 new_task_l = NULL;
-            } else {
-                /* Has solved all :) */
 
-                #pragma omp critical
-                {
-                  if (gDONE == 0) {
-                    gDONE = 1;
-                    copy_to_gMOAS(task_l->state);
-
-                    free(task_l);
-                  }
-                }
-
-                return;
+                /* Backtrack */
+                ptr--;
+                task_l->state[gMOAS->empty_sq[ptr + base_ptr]->row]
+                [gMOAS->empty_sq[ptr + base_ptr]->col] = 0;
             }
         } else {
-            /* Try again */
+            /* Branch sideways */
 
             v_plays[ptr]++;
         }
-
-        cnt++;
     }
 
-    //printf("*** Task: b:%d s:%d a:%d DONE ***\n", base_ptr, nplays, aim_ptr);
+    // printf("*** Task: b:%d s:%d a:%d DONE ***\n", base_ptr, nplays, aim_ptr);
 
+    // printf("Level: %d, Branchs:%d\n", task_l->level, cnt);
     free(task_l);
     free(v_plays);
 
-    #pragma omp critical
-    {
-      idle++;
+    return;
+}
+
+void create_steps() {
+    int i, sum = 0, left;
+
+    printf("Partition: ");
+
+    for (i = 0; i < N_LEVELS; i++) {
+        sum += partition[i];
     }
 
-    //#pragma omp taskwait
+    left = gMOAS->n_empty_sq;
+
+    for (i = 0; i < N_LEVELS - 1; i++) {
+        steps[i] = (int_fast32_t)(gMOAS->n_empty_sq * partition[i] / sum) + 1;
+
+        printf("%d  ", steps[i]);
+
+        left -= steps[i];
+    }
+
+    steps[N_LEVELS - 1] = left;
+
+    printf("%d\n", steps[N_LEVELS - 1]);
+
+    return;
 }
 
 int main(int argc, char const *argv[]) {
-  task_log *orig_task_l;
+    task_log *orig_task_l;
 
-  if (argc != N_ARGS) {
-    char error[64];
-    sprintf(error, "Usage: %s filename\n", argv[0]);
-    print_error(error);
-  }
-
-  if (read_file(argv[1]) != 0) {
-    char error[64];
-    sprintf(error, "Unable to read file %s\n", argv[1]);
-    print_error(error);
-  }
-
-  puts("~~~ Input Sudoku ~~~");
-  print_grid(gMOAS->to_solve);
-
-  // Solve the puzzle
-  orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, gMOAS->n_empty_sq);
-  double start = omp_get_wtime();
-  #pragma omp parallel
-  {
-    #pragma omp critical
-    {
-      idle++;
+    if (argc != N_ARGS) {
+        char error[64];
+        sprintf(error, "Usage: %s filename\n", argv[0]);
+        print_error(error);
     }
 
-    #pragma omp single
-    solve_task_sudoku(orig_task_l);
+    if (read_file(argv[1]) != 0) {
+        char error[64];
+        sprintf(error, "Unable to read file %s\n", argv[1]);
+        print_error(error);
+    }
 
-    #pragma omp taskwait
-
-  }
-  double finish = omp_get_wtime();
-  if (gDONE) {
-    puts("~~~ Output Sudoku ~~~");
+    puts("~~~ Input Sudoku ~~~");
     print_grid(gMOAS->to_solve);
-    printf("Solved Sudoku\n");
-    // Solution found
-  } else {
-    printf("Did not solve Sudoku\n");
-    // No solution
-  };
 
-  free_gMOAS();
-  printf("Total Time %lfs\n", (double)(finish - start));
-  return 0;
+    create_steps();
+
+    // Solve the puzzle
+    orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0, 0);
+    double start = omp_get_wtime();
+    #pragma omp parallel
+    {
+        #pragma omp single
+        solve_task_sudoku(orig_task_l);
+
+        #pragma omp taskwait
+    }
+    double finish = omp_get_wtime();
+    if (gDONE) {
+        puts("~~~ Output Sudoku ~~~");
+        print_grid(gMOAS->to_solve);
+        printf("Solved Sudoku\n");
+        // Solution found
+    } else {
+        printf("Did not solve Sudoku\n");
+        // No solution
+    };
+
+    free_gMOAS();
+    printf("Total Time %lfs\n", (finish - start));
+    return 0;
 }
