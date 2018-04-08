@@ -41,6 +41,7 @@ comparisson: omp/
 	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-subqueues
 	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-tasks
 	$(CC) omp/sudoku-omp-reborn.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-reborn
+	$(CC) serial/sudoku-serial-iter.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-serial
 
 clean:
 	-@rm $(BINARY)*

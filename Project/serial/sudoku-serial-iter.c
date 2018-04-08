@@ -244,7 +244,7 @@ int main(int argc, char const *argv[]) {
 
     clock_t begin, end;
 
-    if (argc != N_ARGS) {
+    if (argc < N_ARGS) {
         char error[64];
         sprintf(error, "Usage: %s filename\n", argv[0]);
         print_error(error);
@@ -273,6 +273,6 @@ int main(int argc, char const *argv[]) {
     };
 
     free_sudoku(to_solve);
-    printf("Total Time %f\n", (double)(end - begin) / CLOCKS_PER_SEC);
+    printf("%f\n", (double)(end - begin) / CLOCKS_PER_SEC);
     return 0;
 }
