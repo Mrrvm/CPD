@@ -31,7 +31,7 @@ def test(file, threads):
 signal.signal(signal.SIGALRM, timeout_handler)
 files = [
     "./testfiles/4x4.txt", "./testfiles/9x9.txt", "./testfiles/9x9-nosol.txt",
-    "./testfiles/16x16.txt", "./testfiles/25x25.txt"
+    "./testfiles/25x25.txt"
 ]
 
 data = []

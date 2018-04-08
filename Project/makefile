@@ -32,11 +32,15 @@ static: omp/sudoku-omp_tasks_stati.c
 profile: omp/sudoku-omp_tasks.c
 	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
 
-ompp: omp/sudoku-omp_tasks.c
-	kinst-ompp-papi gcc omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
-
 BPsubqueues: omp/sudoku-omp_BPsubqueues.c
 	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+
+comparisson: omp/
+	$(CC) omp/sudoku-omp-adapta.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-adapta
+	$(CC) omp/sudoku-omp_bfs.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-bfs
+	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-subqueues
+	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-tasks
+	$(CC) omp/sudoku-omp-reborn.c -fopenmp $(CFLAGS_OPTIM) -o $(BINARY)-reborn
 
 clean:
 	-@rm $(BINARY)*
