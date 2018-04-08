@@ -10,10 +10,10 @@
 
 #define N_ARGS 2
 #define EMPTY 0
-#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
-#define THRES 10
-
+#define FRAC_THRES 0.9
+#define EXTRA_TASKS 10
+ 
 typedef struct square_struct {
     int_fast8_t row;
     int_fast8_t col;
@@ -39,6 +39,7 @@ typedef struct task_log_t {
 int gDONE;
 int idle;
 moas *gMOAS;
+int treshold;
 
 void print_error(char *error) {
     fprintf(stderr, error);
@@ -192,7 +193,7 @@ sudoku new_state_copy(sudoku old_state) {
 }
 
 task_log *new_task_log(sudoku old_state, int next_ptr) {
-    task_log *new = (task_log *)malloc(sizeof(task_log));
+    task_log *new = (task_log*) malloc(sizeof(task_log));
 
     new->state = new_state_copy(old_state);
     new->next_ptr = next_ptr;
@@ -200,26 +201,7 @@ task_log *new_task_log(sudoku old_state, int next_ptr) {
     return new;
 }
 
-void print_branch(int level, int try) {
-    int i;
-
-    for (i = 0; i < level; i++)
-        printf("  ");
-
-    printf("%d\n", try);
-}
-
-void print_line(int *v, int n) {
-    int i;
-
-    for (i = 0; i < n; i++) {
-        printf("%d, ", v[i]);
-    }
-
-    printf("\n");
-}
-
-void solve_task_sudoku(task_log *task_l) {
+void solve_task_sudoku (task_log *task_l) {
     task_log *task_top, *new_task_l;
     int nplays, *v_plays;
     int ptr, base_ptr;
@@ -235,7 +217,6 @@ void solve_task_sudoku(task_log *task_l) {
 
     nplays = gMOAS->n_empty_sq - base_ptr;
 
-    // printf("*** Task: b:%d INIT ***\n", base_ptr);
 
     v_plays = (int *)malloc(nplays * sizeof(int));
 
@@ -270,9 +251,8 @@ void solve_task_sudoku(task_log *task_l) {
             continue;
         }
 
-        /* Fork task workload if idle threads are detected. */
-        if ((base_ptr + top) < THRES && idle > 0 && top < ptr &&
-                top < (nplays - 1)) {
+        /* Fork task workload from top if idle threads are detected. */
+        if ((base_ptr-top) < treshold && top < ptr && top < (nplays - 1) && idle > 0) {
 
             if (safe(task_top->state, gMOAS->empty_sq[top + base_ptr],
                      v_plays[top])) {
@@ -289,11 +269,11 @@ void solve_task_sudoku(task_log *task_l) {
                     top++;
                 } else {
 
-                    #pragma omp critical
-                    { idle--; }
+                    #pragma omp atomic
+                    idle --;
 
-                    printf("Launch sub-task, level %d, option %d\n", top, v_plays[top]);
-
+                    //printf("Launch sub-task, level %d, option %d\n", top, v_plays[top]);
+                                
                     /* Create new task */
                     new_task_l =
                         (task_log *)new_task_log(task_top->state, (base_ptr + top + 1));
@@ -377,10 +357,8 @@ void solve_task_sudoku(task_log *task_l) {
 
     // printf("*** Task: b:%d DONE ***\n", base_ptr);
 
-    #pragma omp critical
-    {
-        idle++;
-    }
+    #pragma omp atomic
+    idle++;
 
     return;
 }
@@ -403,25 +381,30 @@ int main(int argc, char const *argv[]) {
         print_error(error);
     }
 
+    treshold = (int) (FRAC_THRES * (double) gMOAS->n_empty_sq);
+    idle = EXTRA_TASKS;
     omp_set_num_threads(thread_count);
+
     puts("~~~ Input Sudoku ~~~");
     print_grid(gMOAS->to_solve);
-
-    idle = 1;
 
     // Solve the puzzle
     orig_task_l = new_task_log(new_state_copy(gMOAS->to_solve), 0);
     double start = omp_get_wtime();
     #pragma omp parallel
     {
-        #pragma omp critical
-        { idle++; }
+        #pragma omp atomic
+        idle ++;
 
         #pragma omp single
-        solve_task_sudoku(orig_task_l);
+        {
+            idle --;
+            solve_task_sudoku(orig_task_l);    
+        }
 
         #pragma omp taskwait
     }
+
     double finish = omp_get_wtime();
     if (gDONE) {
         puts("~~~ Output Sudoku ~~~");
