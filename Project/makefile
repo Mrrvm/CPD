@@ -29,8 +29,8 @@ masks: omp/sudoku-omp_masks.c
 static: omp/sudoku-omp_tasks_stati.c
 	$(CC) omp/sudoku-omp_tasks_stati.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
-profile: omp/sudoku-omp_tasks.c
-	$(CC) omp/sudoku-omp_tasks.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-omp
+heap: omp/sudoku-omp-adapta.c
+	$(CC) omp/sudoku-omp-adapta.c -fopenmp $(CFLAGS) -lprofiler -ltcmalloc -o $(BINARY)-heap
 
 BPsubqueues: omp/sudoku-omp_BPsubqueues.c
 	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
