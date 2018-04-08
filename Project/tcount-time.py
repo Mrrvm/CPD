@@ -31,11 +31,12 @@ def test(file, threads):
 signal.signal(signal.SIGALRM, timeout_handler)
 files = [
     "./testfiles/4x4.txt", "./testfiles/9x9.txt", "./testfiles/9x9-nosol.txt",
-    "./testfiles/16x16.txt", "./testfiles/25x25.txt"
+    "./testfiles/16x16.txt", "./testfiles/16x16_medium.txt",
+    "./testfiles/16x16-nosol.txt", "./testfiles/25x25.txt"
 ]
 
 data = []
-thread_list = [2, 4, 6, 8]
+thread_list = [1, 2, 4, 8]
 
 for filename in files:
     trace = go.Scatter(
@@ -43,11 +44,11 @@ for filename in files:
         y=[],
         dx=1,
         mode='lines+markers',
-        name=os.path.basename(os.path.normpath(filename)),
+        name=os.path.splitext(os.path.basename(os.path.normpath(filename)))[0],
         hoverinfo='text+name',
         line=dict(shape='spline'))
     for thread_n in thread_list:
-        signal.alarm(3 * 60)
+        signal.alarm(1 * 60)
         try:
             result = test(filename, thread_n)
             trace.x.append(thread_n)
@@ -62,11 +63,10 @@ for filename in files:
         data.append(trace)
 
 layout = go.Layout(
-    title='Kuduro, the Sudoku solver',
+    title='Kuduro - Threads/Execution Time',
     xaxis=dict(
         title='Thread Count',
-        titlefont=dict(
-            family='Noto Sans, sans-serif', size=16, color='lightgrey'),
+        titlefont=dict(family='Noto Sans, sans-serif', size=16, color='grey'),
         tick0=1,
         dtick=1,
         autotick=False,
@@ -78,8 +78,7 @@ layout = go.Layout(
         showticklabels=True),
     yaxis=dict(
         title='Execution Time (s)',
-        titlefont=dict(
-            family='Noto Sans, sans-serif', size=16, color='lightgrey'),
+        titlefont=dict(family='Noto Sans, sans-serif', size=16, color='grey'),
         showticklabels=True,
         autorange=True,
         showgrid=True,
@@ -89,5 +88,4 @@ layout = go.Layout(
         ticks=''))
 
 fig = dict(data=data, layout=layout)
-
 offline.plot(fig, image='png')
