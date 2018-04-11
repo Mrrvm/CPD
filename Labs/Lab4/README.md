@@ -2,6 +2,8 @@
 
 ## Ex 1
 
+![Image1](https://github.com/Mrrvm/CPD/blob/master/Labs/Lab4/ex1.png)
+
 ## Ex 2
 
 ```
