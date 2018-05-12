@@ -4,15 +4,15 @@ CFLAGS_OPTIM = -march=native -std=gnu11 -O3 -Os
 CFLAGS_RELEASE = -march=native -std=gnu11 -O2 -Os
 BINARY = kuduro
 
-all: serial-recur serial-iter omp
+all: serial mpi
 
-default: omp
+default: mpi
 
 serial: serial/sudoku-serial.c
 	$(CC) serial/sudoku-serial.c $(CFLAGS) -o $(BINARY)-serial
 
 
-BPsubqueues: mpi/sudoku.c
+mpi: mpi/sudoku.c
 	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
 
 clean:
