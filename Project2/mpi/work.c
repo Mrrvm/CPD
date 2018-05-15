@@ -7,6 +7,7 @@
 #define WORK_TAG 3
 #define NO_WORK_TAG 4
 #define PLAY_TAG 5
+#define FINISH_TAG 6
 
 void exit_colony(int ntasks) {
     int id, msg = 0;
@@ -40,20 +41,35 @@ void master(){
 
     // Redistribute work while there is available work
     while (nwork > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, NO_WORK_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        // get new work from work pool
-        top = nwork--;
+        if (status.MPI_TAG == NO_WORK_TAG) {
+          // get new work from work pool
+          top = nwork--;
 
-        // send new work
-        MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
+          // send new work
+          MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
+        } else if (status.MPI_TAG == FINISH_TAG) {
+            printf("Solution! Can exit all\n");
+
+            exit_colony(ntasks);
+            return;
+        }
     }
 
     // Wait for still active slaves
     while (active_slaves > 0) {
-      MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, NO_WORK_TAG, MPI_COMM_WORLD, &status);
+      MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-      active_slaves--;
+      if (status.MPI_TAG == NO_WORK_TAG) {
+
+          active_slaves--;
+      } else if (status.MPI_TAG == FINISH_TAG) {
+          printf("Solution! Can exit all\n");
+
+          exit_colony(ntasks);
+          return;
+      }
     }
 
     // Send exit signal
@@ -79,9 +95,16 @@ void slave(int my_id) {
             // do work
             sleep(1);
 
-            printf("Process %d finished work %d\n", my_id, msg);
+            // final work?
+            if (msg == my_id*2) {
+                printf("Process %d found solution %d!\n", my_id, msg);
 
-            MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
+                MPI_Send(&msg, 1, MPI_INT, 0, FINISH_TAG, MPI_COMM_WORLD);
+            } else {
+                printf("Process %d finished work %d\n", my_id, msg);
+
+                MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
+            }
         }
 
         //print_grid();
