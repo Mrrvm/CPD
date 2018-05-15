@@ -48,7 +48,7 @@ void print_grid() {
 void read_file(const char *filename, int ntasks) {
     FILE *sudoku_file;
     int box_size;
-    uint8_t num;
+    int num;
     int x, y, id, n;
 
     sudoku_file = fopen(filename, "re");
@@ -84,7 +84,7 @@ void read_file(const char *filename, int ntasks) {
         gMOAS->known[x] = (int *)calloc(gMOAS->n, sizeof(int));
         gMOAS->grid[x] = (int *)calloc(gMOAS->n, sizeof(int));
         for (y = 0; y < gMOAS->n; y++) {
-            fscanf(sudoku_file, "%2" SCNu8, &num);
+            fscanf(sudoku_file, "%d", &num);
             //set_cell(x, y, num);
             gMOAS->known[x][y] = num;
             for (id = 1; id < ntasks; ++id) {
@@ -139,7 +139,7 @@ void master(){
 
     print_grid();
 
-    // Send exit signal 
+    // Send exit signal
     exit_colony(ntasks);
 }
 
@@ -153,7 +153,7 @@ void slave() {
 
     while(1) {
         MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-    
+
         if (status.MPI_TAG == DIE_TAG) {
             return;
         }
@@ -173,7 +173,6 @@ int main (int argc, char *argv[]) {
     } else {
         slave();
     }
-    MPI_Finalize(); 
+    MPI_Finalize();
     return 0;
 }
-
