@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define INIT_BUFF 6
 #define WORK_TRESH 4
 
 enum tags {INIT_TAG = 1, DIE_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG};
@@ -31,6 +32,26 @@ void round_robin(int *slaves_state, int ntasks, int state, int begin) {
   return -1;
 }
 
+int *initial_work(int ntasks, int *top, int *size) {
+
+    int depth = 1, acc = gMOAS->box_size;
+    int *work;
+
+    while (acc < (ntasks + INIT_BUFF) && depth <= gMOAS->box_size)
+        acc *= (gMOAS->box_size - depth++);
+
+    *size = acc*2;
+    work = (int*) calloc (*size, sizeof(int));
+    *top = 0;
+
+    /* Explore to depth */
+
+    /* Add all possible solutions (to depth) to work */
+
+
+    return work;
+}
+
 void master() {
 
     MPI_Status status;
@@ -38,12 +59,12 @@ void master() {
     int robin = 1;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     int idle_slaves = ntasks;
-    int slaves_state[ntasks] = {0};
-    int work[20] = {0}, top, lost_work = 0;
+    int slaves_state[ntasks] = {IDLE};
+    int *work, top, wk_size, lost_work = 0;
     int play;
 
     // Prepare initial work pool
-    int top = 15;
+    work = initial_work(ntasks, &top, &wk_size);
 
     // Distribute initial work
     for (id = 1; id < ntasks; ++id) {
