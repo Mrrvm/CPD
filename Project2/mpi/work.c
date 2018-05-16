@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,6 +13,63 @@
 #define IDLE 100
 #define WORKING 101
 
+
+typedef struct mask {
+    __uint128_t *rows;
+    __uint128_t *cols;
+    __uint128_t *squares;
+    __uint128_t *bits;
+    int **grid;
+} mask_t;
+
+typedef struct moas {
+    int n;
+    int box_size;
+    int **known;
+    mask_t mask;
+} moas_t;
+
+moas_t *gMOAS;
+
+int square(int i, int j) {
+    return (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
+}
+
+void set_cell(int i, int j, int n, mask_t *mask) {
+    mask->grid[i][j] = n;
+    mask->rows[i] |= mask->bits[n];
+    mask->cols[j] |= mask->bits[n];
+    mask->squares[square(i, j)] |= mask->bits[n];
+}
+
+int clear_cell(int i, int j, mask_t *mask) {
+    int n = mask->grid[i][j];
+    mask->grid[i][j] = 0;
+    mask->rows[i] &= ~mask->bits[n];
+    mask->cols[j] &= ~mask->bits[n];
+    mask->squares[square(i, j)] &= ~mask->bits[n];
+    return n;
+}
+
+bool is_available(int i, int j, int n, mask_t *mask) {
+    return (mask->rows[i] & mask->bits[n]) == 0 &&
+           (mask->cols[j] & mask->bits[n]) == 0 &&
+           (mask->squares[square(i, j)] & mask->bits[n]) == 0;
+}
+
+void print_grid(mask_t *mask) {
+    for (int x = 0; x < gMOAS->n; x++) {
+        for (int y = 0; y < gMOAS->n; y++) {
+            if (gMOAS->known[x][y]) {
+                printf("%2d ", gMOAS->known[x][y]);
+            } else {
+                printf("%2d ", mask->grid[x][y]);
+            }
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
 
 void exit_colony(int ntasks) {
     int id, msg = 0;
