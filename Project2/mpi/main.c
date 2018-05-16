@@ -17,16 +17,17 @@ void exit_colony(int ntasks) {
     int id, msg = 0;
 
     for (id = 1; id < ntasks; ++id) {
-        MPI_Send(&msg, 1, MPI_INT, id, DIE_TAG, MPI_COMM_WORLD);
+        MPI_Bcast(&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
 }
 
 void master() {
 
-    int ntasks, id, msg;
-    int top, active_slaves = 0;
     MPI_Status status;
+    int ntasks, id, msg, top;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
+    int idle_slaves = ntasks;
+    int slaves_state[ntasks] = {0};
 
     // Prepare initial work pool
     int nwork = 10;
@@ -40,8 +41,55 @@ void master() {
         MPI_Send(&top, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
         printf("Master sent work %d to Process %d\n", top, id);
 
-        active_slaves++;
+        slaves_state[id] = 1;
+        idle_slaves--;
     }
+
+    while (1) {
+
+        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        if(status.MPI_TAG == NO_WORK_TAG) 
+            // Send work from queue
+            // Or,
+            // Gets work from other slave (send msg RED_TAG)
+        }
+        else if(status.MPI_TAG == SOLUTION_TAG) {
+            // Sends DIE_TAG by broadcast
+            exit_colony(ntasks);
+            
+        }
+        else if(status.MPI_TAG == WORK_TAG) {
+            // Saves on queue
+            // Or,
+            // Sends immediately to the neeedy slave
+        }
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 
     // Redistribute work while there is available work
     while (nwork > 0) {
@@ -77,9 +125,8 @@ void master() {
             return;
         }
     }
+*/
 
-    // Send exit signal
-    exit_colony(ntasks);
 }
 
 void slave(int my_id) {
