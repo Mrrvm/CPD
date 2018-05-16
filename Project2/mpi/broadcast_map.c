@@ -41,6 +41,11 @@ typedef struct moas {
     mask_t *mask;
 } moas_t;
 
+typedef struct work_type {
+    info_t *history;
+    int history_len;
+} work_t;
+
 moas_t *gMOAS;
 int gDONE;
 
@@ -117,6 +122,49 @@ bool advance_cell(int i, int j) {
         }
     }
     return false;
+}
+
+work_t *initial_work(int ntasks, int *top, int *size) {
+
+    int total = 1, acc = gMOAS->box_size;
+    work_t *work;
+    int pos = 0;
+
+    while (acc < (ntasks + INIT_BUFF) && total <= gMOAS->box_size)
+        acc *= (gMOAS->box_size - total++);
+
+    *size = acc*2;
+    work = (int*) calloc (*size, sizeof(work_t));
+    *top = 0;
+
+    /* Explore to depth total */
+    while (1) {
+        while (pos < total && gMOAS->known[pos / gMOAS->n][pos % gMOAS->n]) {
+            ++pos;
+        }
+        if (pos >= total) {
+              /* save this history */
+              work[*top].history =
+              work[*top].history_len =
+              (*top)++;
+
+              /* backtrack */
+
+        }
+
+        if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
+            ++pos;
+        } else {
+            if (gMOAS->mask->history_len == 0) {
+                break;
+            }
+            pos = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
+                  gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
+            remove_last_from_history(gMOAS->mask);
+        }
+    }
+
+    return work;
 }
 
 void solve(int pos, int total) {
