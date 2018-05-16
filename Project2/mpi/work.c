@@ -1,7 +1,7 @@
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
-#include <unistd.hq>
+#include <unistd.h>
 
 #define INIT_TAG 1
 #define DIE_TAG 2
@@ -18,7 +18,7 @@ void exit_colony(int ntasks) {
     }
 }
 
-void master(){
+void master() {
 
     int ntasks, id, msg;
     int top, active_slaves = 0;
@@ -42,14 +42,15 @@ void master(){
 
     // Redistribute work while there is available work
     while (nwork > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
+                 &status);
 
         if (status.MPI_TAG == NO_WORK_TAG) {
-          // get new work from work pool
-          top = nwork--;
+            // get new work from work pool
+            top = nwork--;
 
-          // send new work
-          MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
+            // send new work
+            MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
         } else if (status.MPI_TAG == FINISH_TAG) {
             printf("Solution! Can exit all\n");
 
@@ -60,17 +61,18 @@ void master(){
 
     // Wait for still active slaves
     while (active_slaves > 0) {
-      MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
+                 &status);
 
-      if (status.MPI_TAG == NO_WORK_TAG) {
+        if (status.MPI_TAG == NO_WORK_TAG) {
 
-          active_slaves--;
-      } else if (status.MPI_TAG == FINISH_TAG) {
-          printf("Solution! Can exit all\n");
+            active_slaves--;
+        } else if (status.MPI_TAG == FINISH_TAG) {
+            printf("Solution! Can exit all\n");
 
-          exit_colony(ntasks);
-          return;
-      }
+            exit_colony(ntasks);
+            return;
+        }
     }
 
     // Send exit signal
@@ -84,15 +86,14 @@ void slave(int my_id) {
     int msg = 0, top, *play;
     int i, flag;
 
-    while(1) {
+    while (1) {
         MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
         if (status.MPI_TAG == DIE_TAG) {
             printf("Process %d DIED\n", my_id);
 
             return;
-        }
-        else if(status.MPI_TAG == WORK_TAG) {
+        } else if (status.MPI_TAG == WORK_TAG) {
             top = msg;
 
             printf("Process %d got work %d\n", my_id, msg);
@@ -104,16 +105,16 @@ void slave(int my_id) {
                 MPI_Test(&request, &flag, &status);
 
                 if (flag) {
-                  printf("Process %d DIED\n", my_id);
+                    printf("Process %d DIED\n", my_id);
 
-                  return;
+                    return;
                 }
 
                 sleep(1);
                 printf("Process %d id work %d/%d\n", my_id, i, top);
             }
 
-            //sleep(10);
+            // sleep(10);
 
             MPI_Cancel(&request);
 
@@ -128,7 +129,7 @@ void slave(int my_id) {
             */
 
             // final work?
-            if (msg == my_id*2) {
+            if (msg == my_id * 2) {
                 printf("Process %d found solution %d!\n", my_id, top);
 
                 MPI_Send(&msg, 1, MPI_INT, 0, FINISH_TAG, MPI_COMM_WORLD);
@@ -139,11 +140,11 @@ void slave(int my_id) {
             }
         }
 
-        //print_grid();
+        // print_grid();
     }
 }
 
-int main (int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 
     int my_id;
     MPI_Init(&argc, &argv);
