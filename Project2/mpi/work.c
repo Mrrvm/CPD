@@ -7,8 +7,11 @@
 #define DIE_TAG 2
 #define WORK_TAG 3
 #define NO_WORK_TAG 4
-#define PLAY_TAG 5
-#define FINISH_TAG 6
+#define SOLUTION_TAG 6
+
+#define IDLE 100
+#define WORKING 101
+
 
 void exit_colony(int ntasks) {
     int id, msg = 0;
@@ -84,63 +87,57 @@ void slave(int my_id) {
     MPI_Status status;
     MPI_Request request;
     int msg = 0, top, *play;
-    int i, flag;
+    int i, flag = -1, state = IDLE;
 
     while (1) {
-        MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        if (status.MPI_TAG == DIE_TAG) {
-            printf("Process %d DIED\n", my_id);
-
-            return;
-        } else if (status.MPI_TAG == WORK_TAG) {
-            top = msg;
-
-            printf("Process %d got work %d\n", my_id, msg);
-
-            MPI_Irecv(&msg, 1, MPI_INT, 0, DIE_TAG, MPI_COMM_WORLD, &request);
-
-            // do work (watch out for order)
-            for (i = 0; i < 3; i++) {
-                MPI_Test(&request, &flag, &status);
-
-                if (flag) {
-                    printf("Process %d DIED\n", my_id);
-
-                    return;
-                }
-
-                sleep(1);
-                printf("Process %d id work %d/%d\n", my_id, i, top);
-            }
-
-            // sleep(10);
-
-            MPI_Cancel(&request);
-
-            /*
-            MPI_Test(&request, &flag, &status);
-
-            if (flag) {
-                printf("Process %d DIED\n", my_id);
-
-                return;
-            }
-            */
-
-            // final work?
-            if (msg == my_id * 2) {
-                printf("Process %d found solution %d!\n", my_id, top);
-
-                MPI_Send(&msg, 1, MPI_INT, 0, FINISH_TAG, MPI_COMM_WORLD);
-            } else {
-                printf("Process %d finished work %d\n", my_id, top);
-
-                MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
-            }
+        if(flag != 0) {
+            MPI_Irecv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &request);
+            flag = 0 ;
         }
 
-        // print_grid();
+        MPI_Test(&request, &flag, &status);
+
+        if(flag == 1) {
+            if (status.MPI_TAG == WORK_TAG) {
+                // Probe msg to get size
+                // Receive work 
+                printf("Process %d got work %d\n", my_id, msg);
+                state = WORKING;
+            }
+            else if (status.MPI_TAG == RED_TAG) {
+                // Redistribute work and send to master
+                printf("Process %d redistributed work\n", my_id);
+                state = WORKING;
+            }
+            else if (status.MPI_TAG == INIT_TAG) {
+                // Receive map
+            }
+            else if (status.MPI_TAG == SOLUTION_TAG) {
+                printf("Process %d found solution\n", my_id);
+                return;
+            }
+            else if (status.MPI_TAG == DIE_TAG) {
+                printf("Process %d DIED\n", my_id);
+                return;
+            }
+            flag = -1;
+        }
+
+        if(state == WORKING) {
+            // Do work    
+
+            // If found solution
+            if(solution) {
+                // Send msg SOLUTION_TAG to master
+            }
+
+            // When ending
+            if(ended) {
+                // Send msg NO_WORK_TAG to master
+                state = IDLE;     
+            }
+        }
     }
 }
 
