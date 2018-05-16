@@ -14,6 +14,21 @@ void exit_colony(int ntasks) {
     }
 }
 
+void round_robin(int *slaves_state, int ntasks, int state, int begin) {
+  int id, robin = begin;
+
+  for (id = 1; id < ntasks; ++id) {
+      robin = (robin == ntasks-1) ? (1) : (robin+1);
+
+      if (slaves_state[robin] == state) {
+
+          return robin;
+      }
+  }
+
+  return -1;
+}
+
 void master() {
 
     MPI_Status status;
@@ -117,89 +132,15 @@ void master() {
         }
 
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-    // Redistribute work while there is available work
-    while (nwork > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
-                 &status);
-
-        if (status.MPI_TAG == NO_WORK_TAG) {
-            // get new work from work pool
-            top = nwork--;
-
-            // send new work
-            MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
-        } else if (status.MPI_TAG == FINISH_TAG) {
-            printf("Solution! Can exit all\n");
-
-            exit_colony(ntasks);
-            return;
-        }
-    }
-
-    // Wait for still active slaves
-    while (active_slaves > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
-                 &status);
-
-        if (status.MPI_TAG == NO_WORK_TAG) {
-
-            active_slaves--;
-        } else if (status.MPI_TAG == FINISH_TAG) {
-            printf("Solution! Can exit all\n");
-
-            exit_colony(ntasks);
-            return;
-        }
-    }
-*/
-
 }
 
-void round_robin(int *slaves_state, int ntasks, int state, int begin) {
-  int id, robin = begin;
-
-  for (id = 1; id < ntasks; ++id) {
-      robin = (robin == ntasks-1) ? (1) : (robin+1);
-
-      if (slaves_state[robin] == state) {
-
-          return robin;
-      }
-  }
-
-  return -1;
-}
 
 void slave(int my_id) {
 
     MPI_Status status;
     MPI_Request request;
     int msg = 0, top, *play;
-    int i, flag = -1, state = IDLE;
+    int i, flag = -1, state = IDLE, size;
 
     while (1) {
 
@@ -213,7 +154,10 @@ void slave(int my_id) {
         if(flag == 1) {
             if (status.MPI_TAG == WORK_TAG) {
                 // Probe msg to get size
-                // Receive work
+                MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+                MPI_Get_count(&status, MPI_INT, &size);
+                // Alloc work with size
+                // Set msg to work data
                 printf("Process %d got work %d\n", my_id, msg);
                 state = WORKING;
             }
@@ -224,6 +168,7 @@ void slave(int my_id) {
             }
             else if (status.MPI_TAG == INIT_TAG) {
                 // Receive map
+
             }
             else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
