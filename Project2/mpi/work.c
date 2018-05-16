@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <unistd.h>
 
 #define INIT_TAG 1
 #define DIE_TAG 2
@@ -100,7 +101,7 @@ void slave(int my_id) {
 
             // do work (watch out for order)
             for (i = 0; i < 3; i++) {
-                MPI_Test(request, &flag, &status);
+                MPI_Test(&request, &flag, &status);
 
                 if (flag) {
                   printf("Process %d DIED\n", my_id);
@@ -112,9 +113,11 @@ void slave(int my_id) {
                 printf("Process %d id work %d/%d\n", my_id, i, top);
             }
 
-            MPI_Cancel(request);
+            //sleep(10);
 
-            MPI_Test(request, &flag, &status);
+            MPI_Cancel(&request);
+
+            MPI_Test(&request, &flag, &status);
 
             if (flag) {
                 printf("Process %d DIED\n", my_id);
