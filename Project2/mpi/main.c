@@ -16,6 +16,21 @@ void exit_colony(int ntasks) {
     }
 }
 
+void round_robin(int *slaves_state, int ntasks, int state, int begin) {
+  int id, robin = begin;
+
+  for (id = 1; id < ntasks; ++id) {
+      robin = (robin == ntasks-1) ? (1) : (robin+1);
+
+      if (slaves_state[robin] == state) {
+
+          return robin;
+      }
+  }
+
+  return -1;
+}
+
 void master() {
 
     MPI_Status status;
@@ -148,27 +163,13 @@ void master() {
 
 }
 
-void round_robin(int *slaves_state, int ntasks, int state, int begin) {
-  int id, robin = begin;
-
-  for (id = 1; id < ntasks; ++id) {
-      robin = (robin == ntasks-1) ? (1) : (robin+1);
-
-      if (slaves_state[robin] == state) {
-
-          return robin;
-      }
-  }
-
-  return -1;
-}
 
 void slave(int my_id) {
 
     MPI_Status status;
     MPI_Request request;
     int msg = 0, top, *play;
-    int i, flag = -1, state = IDLE;
+    int i, flag = -1, state = IDLE, size;
 
     while (1) {
 
@@ -182,7 +183,10 @@ void slave(int my_id) {
         if(flag == 1) {
             if (status.MPI_TAG == WORK_TAG) {
                 // Probe msg to get size
-                // Receive work
+                MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+                MPI_Get_count(&status, MPI_INT, &size);
+                // Alloc work with size
+                // Set msg to work data
                 printf("Process %d got work %d\n", my_id, msg);
                 state = WORKING;
             }
@@ -193,6 +197,7 @@ void slave(int my_id) {
             }
             else if (status.MPI_TAG == INIT_TAG) {
                 // Receive map
+
             }
             else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);

@@ -6,6 +6,17 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#define INIT_TAG 1
+#define DIE_TAG 2
+#define WORK_TAG 3
+#define NO_WORK_TAG 4
+#define SOLUTION_TAG 6
+
+#define IDLE 100
+#define WORKING 101
+
+typedef unsigned __int128 uint128_t;
+
 typedef struct mask {
     __uint128_t *rows;
     __uint128_t *cols;
@@ -22,6 +33,7 @@ typedef struct moas {
 } moas_t;
 
 moas_t *gMOAS;
+int gDONE;
 
 int square(int i, int j) {
     return (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
@@ -50,10 +62,10 @@ bool is_available(int i, int j, int n, mask_t *mask) {
 }
 
 bool advance_cell(int i, int j) {
-    int n = clear_cell(i, j);
+    int n = clear_cell(i, j, gMOAS->mask);
     while (++n <= gMOAS->n) {
-        if (is_available(i, j, n)) {
-            set_cell(i, j, n);
+        if (is_available(i, j, n, gMOAS->mask)) {
+            set_cell(i, j, n, gMOAS->mask);
             return true;
         }
     }
@@ -61,12 +73,13 @@ bool advance_cell(int i, int j) {
 }
 
 void free_gMOAS() {
-    for (int i = 0; i < gMOAS->n; i++) {
-        free(gMOAS->->known[i]);
+    int i;
+    for (i = 0; i < gMOAS->n; i++) {
+        free(gMOAS->known[i]);
         free((gMOAS->mask)->grid[i]);
     }
     free(gMOAS->known);
-    free(gMOAS->grid);
+    free((gMOAS->mask)->grid);
     free((gMOAS->mask)->rows);
     free((gMOAS->mask)->cols);
     free((gMOAS->mask)->squares);
@@ -75,12 +88,13 @@ void free_gMOAS() {
 }
 
 void print_grid(mask_t *mask) {
-    for (int x = 0; x < gMOAS->n; x++) {
-        for (int y = 0; y < gMOAS->n; y++) {
-            if (gMOAS->known[x][y]) {
-                printf("%2d ", gMOAS->known[x][y]);
+    int i, j;
+    for (i = 0; i < gMOAS->n; i++) {
+        for (j = 0; j < gMOAS->n; j++) {
+            if (gMOAS->known[i][j]) {
+                printf("%2d ", gMOAS->known[i][j]);
             } else {
-                printf("%2d ", mask->grid[x][y]);
+                printf("%2d ", mask->grid[i][j]);
             }
         }
         printf("\n");
@@ -121,7 +135,7 @@ void solve(int total) {
 
 void read_file(const char *filename, int ntasks) {
     FILE *sudoku_file;
-    int box_size, num;
+    int box_size, num, i, j;
 
     sudoku_file = fopen(filename, "re");
     if (sudoku_file == NULL) {
@@ -139,20 +153,21 @@ void read_file(const char *filename, int ntasks) {
     gMOAS->box_size = box_size;
     gMOAS->n = box_size * box_size;
     gMOAS->known = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask = (mask_t *)malloc(sizeof(mask_t));
     (gMOAS->mask)->grid = (int **)calloc(gMOAS->n, sizeof(int *));
-    (gMOAS->mask)->rows = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->cols = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->squares = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->bits = (int *)calloc(gMOAS->n + 1, sizeof(int));
-    for (int i = 1; i < gMOAS->n + 1; i++) {
-        gMOAS->bits[i] = 1 << n;
+    (gMOAS->mask)->rows = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->cols = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->squares = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->bits = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    for (i = 1; i < gMOAS->n + 1; i++) {
+        (gMOAS->mask)->bits[i] = 1 << i;
     }
-    for (int i = 0; i < gMOAS->n; i++) {
+    for (i = 0; i < gMOAS->n; i++) {
         gMOAS->known[i] = (int *)calloc(gMOAS->n, sizeof(int));
-        gMOAS->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
-        for (int j = 0; j < gMOAS->n; j++) {
+        (gMOAS->mask)->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        for (j = 0; j < gMOAS->n; j++) {
             fscanf(sudoku_file, "%d", &num);
-            set_cell(i, j, num);
+            set_cell(i, j, num, gMOAS->mask);
             gMOAS->known[i][j] = num;
             MPI_Bcast(&num, 1, MPI_INT, 0, MPI_COMM_WORLD);
         }
@@ -162,7 +177,7 @@ void read_file(const char *filename, int ntasks) {
 
 void build_map() {
 
-    int box_size, num;
+    int box_size, num, i, j;
 
     MPI_Bcast(&box_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
@@ -170,36 +185,37 @@ void build_map() {
     gMOAS->box_size = box_size;
     gMOAS->n = box_size * box_size;
     gMOAS->known = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask = (mask_t *)malloc(sizeof(mask_t));
     (gMOAS->mask)->grid = (int **)calloc(gMOAS->n, sizeof(int *));
-    (gMOAS->mask)->rows = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->cols = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->squares = (int *)calloc(gMOAS->n+1, sizeof(int));
-    (gMOAS->mask)->bits = (int *)calloc(gMOAS->n + 1, sizeof(int));
-    for (int i = 1; i < gMOAS->n + 1; i++) {
-        gMOAS->bits[i] = 1 << n;
+    (gMOAS->mask)->rows = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->cols = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->squares = calloc(gMOAS->n+1, sizeof(uint128_t));
+    (gMOAS->mask)->bits = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    for (i = 1; i < gMOAS->n + 1; i++) {
+        (gMOAS->mask)->bits[i] = 1 << i;
     }
-    for (int i = 0; i < gMOAS->n; i++) {
+    for (i = 0; i < gMOAS->n; i++) {
         gMOAS->known[i] = (int *)calloc(gMOAS->n, sizeof(int));
-        gMOAS->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
-        for (int j = 0; j < gMOAS->n; j++) {
+        (gMOAS->mask)->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        for (j = 0; j < gMOAS->n; j++) {
             MPI_Bcast(&num, 1, MPI_INT, 0, MPI_COMM_WORLD);
-            set_cell(i, j, num);
+            set_cell(i, j, num, gMOAS->mask);
             gMOAS->known[i][j] = num;
         }
     }
 }
 
-void master(){
+void master(char *file){
 
     int ntasks;
     MPI_Status status;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
 
     // Read file and send to slaves
-    read_file("testfiles/4x4.txt", ntasks);
+    read_file(file, ntasks);
 
 
-    print_grid();
+    print_grid(gMOAS->mask);
     // Send exit signal
     exit_colony(ntasks);
     free_gMOAS();
@@ -211,7 +227,7 @@ void slave(int my_id) {
     int msg;
 
     build_map();
-    print_grid();
+    print_grid(gMOAS->mask);
 
     while(1) {
         MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -229,7 +245,7 @@ int main (int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
     if (my_id == 0) {
-        master();
+        master(argv[1]);
     } else {
         slave(my_id);
     }
