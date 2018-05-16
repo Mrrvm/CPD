@@ -1,7 +1,8 @@
 CC = gcc
+DISTCC = mpicc
 CFLAGS = -march=native -std=gnu11 -Wall -Wextra -Werror -g -Wpedantic -Wshadow -Wstrict-overflow -fno-strict-aliasing
-CFLAGS_OPTIM = -march=native -std=gnu11 -O3 -Os
 CFLAGS_RELEASE = -march=native -std=gnu11 -O2 -Os
+CFLAGS_DEBUG = -g
 BINARY = kuduro
 
 all: serial mpi
@@ -9,11 +10,10 @@ all: serial mpi
 default: mpi
 
 serial: serial/sudoku-serial.c
-	$(CC) serial/sudoku-serial.c $(CFLAGS) -o $(BINARY)-serial
+	$(CC) serial/sudoku-serial.c $(CFLAGS_RELEASE) -o $(BINARY)-serial
 
-
-mpi: mpi/sudoku.c
-	$(CC) omp/sudoku-omp_BPsubqueues.c -fopenmp $(CFLAGS_OPTIM) $(CFLAGS) -o $(BINARY)-omp
+mpi: mpi/broadcast_map.c
+	$(DISTCC) mpi/broadcast_map.c $(CFLAGS_DEBUG) -o $(BINARY)-mpi
 
 clean:
 	-@rm $(BINARY)*
