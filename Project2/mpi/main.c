@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define WORK_TRESH 4
+
 enum tags {INIT_TAG = 1, DIE_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG};
 enum slave_st {IDLE = 100, WORKING, REQUEST};
 
@@ -22,7 +24,7 @@ void master() {
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     int idle_slaves = ntasks;
     int slaves_state[ntasks] = {0};
-    int work[20] = {0}, top;
+    int work[20] = {0}, top, lost_work = 0;
     int play;
 
     // Prepare initial work pool
@@ -57,16 +59,18 @@ void master() {
                 MPI_Send(&play, 1, MPI_INT, slave, WORK_TAG, MPI_COMM_WORLD);
 
                 /* If Redistribute */
-                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+                if (top < WORK_TRESH) {
+                    robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
-                if (robin != -1) {
+                    if (robin != -1) {
+                        MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
+                        slaves_state[robin] = REQUEST;
+                    }
+                    else {
+                        lost_work++;
 
-                    MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
-                    slaves_state[robin] = REQUEST;
-                }
-                else {
-
-                    robin = 1;
+                        robin = 1;
+                    }
                 }
 
             }
@@ -75,17 +79,29 @@ void master() {
                 idle++;
                 slaves_state[slave] = IDLE;
 
-                /* Redistribute (if has not passed threshold) */
-                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+                if (idle == ntasks-1) {
+                    /* No work here, no slaves working, its vacation time! */
 
-                if (robin != -1) {
+                    /* No solution found */
 
-                    MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
-                    slaves_state[robin] = REQUEST;
+                    exit_colony(ntasks);
+                    return;
                 }
-                else {
 
-                    robin = 1;
+                /* Redistribute (if has not passed threshold) */
+                if (top < WORK_TRESH) {
+                    robin = round_robin(slaves_state, ntasks, WORKING, slave);
+
+                    if (robin != -1) {
+
+                        MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
+                        slaves_state[robin] = REQUEST;
+                    }
+                    else {
+                        lost_work++;
+
+                        robin = 1;
+                    }
                 }
             }
         }
@@ -97,6 +113,7 @@ void master() {
         else if(status.MPI_TAG == WORK_TAG) {
             play = msg;
 
+            /* Handle work redistributed */
             if (idle > 0) {
                 /* Find one idle slave */
                 robin = round_robin(slaves_state, ntasks, WORKING, slave);
@@ -114,68 +131,20 @@ void master() {
 
                 work[top++] = play;
             }
+
+            /* Slave that shared work state. */
+            if (lost_work > 0) {
+                lost_work--;
+
+                MPI_Send(&msg, 1, MPI_INT, slave, RED_TAG, MPI_COMM_WORLD);
+                slaves_state[slave] = REQUEST;
+            } else {
+
+                slaves_state[slave] = WORKING;
+            }
         }
 
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-    // Redistribute work while there is available work
-    while (nwork > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
-                 &status);
-
-        if (status.MPI_TAG == NO_WORK_TAG) {
-            // get new work from work pool
-            top = nwork--;
-
-            // send new work
-            MPI_Send(&top, 1, MPI_INT, status.MPI_SOURCE, WORK_TAG, MPI_COMM_WORLD);
-        } else if (status.MPI_TAG == FINISH_TAG) {
-            printf("Solution! Can exit all\n");
-
-            exit_colony(ntasks);
-            return;
-        }
-    }
-
-    // Wait for still active slaves
-    while (active_slaves > 0) {
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
-                 &status);
-
-        if (status.MPI_TAG == NO_WORK_TAG) {
-
-            active_slaves--;
-        } else if (status.MPI_TAG == FINISH_TAG) {
-            printf("Solution! Can exit all\n");
-
-            exit_colony(ntasks);
-            return;
-        }
-    }
-*/
 
 }
 
