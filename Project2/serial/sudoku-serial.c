@@ -16,10 +16,10 @@ typedef struct moas {
     int box_size;
     int **grid;
     int **known;
-    int *rows;
-    int *cols;
-    int *squares;
-    int *bits;
+    __uint128_t *rows;
+    __uint128_t *cols;
+    __uint128_t *squares;
+    __uint128_t *bits;
 } moas_t;
 
 moas_t *gMOAS;
@@ -127,17 +127,17 @@ int read_file(const char *filename) {
     gMOAS->box_size = box_size;
     gMOAS->n = box_size * box_size;
     /* Init our bit mask */
-    gMOAS->bits = (int *)calloc(gMOAS->n + 1, sizeof(int));
-    for (int n = 1; n < gMOAS->n + 1; n++) {
-        gMOAS->bits[n] = 1 << n;
+    gMOAS->bits = (__uint128_t *)calloc(gMOAS->n + 1, sizeof(__uint128_t));
+    for (__int128_t n = 1; n < gMOAS->n + 1; n++) {
+        gMOAS->bits[n] = (__uint128_t)1 << n;
     }
 
     /* Read the file */
     gMOAS->known = (int **)calloc(gMOAS->n, sizeof(int *));
     gMOAS->grid = (int **)calloc(gMOAS->n, sizeof(int *));
-    gMOAS->rows = (int *)calloc(gMOAS->n, sizeof(int));
-    gMOAS->cols = (int *)calloc(gMOAS->n, sizeof(int));
-    gMOAS->squares = (int *)calloc(gMOAS->n, sizeof(int));
+    gMOAS->rows = (__uint128_t *)calloc(gMOAS->n, sizeof(__uint128_t));
+    gMOAS->cols = (__uint128_t *)calloc(gMOAS->n, sizeof(__uint128_t));
+    gMOAS->squares = (__uint128_t *)calloc(gMOAS->n, sizeof(__uint128_t));
     for (int x = 0; x < gMOAS->n; x++) {
         gMOAS->known[x] = (int *)calloc(gMOAS->n, sizeof(int));
         gMOAS->grid[x] = (int *)calloc(gMOAS->n, sizeof(int));
