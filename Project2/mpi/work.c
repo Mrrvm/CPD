@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
-#include <unistd.h>
+#include <unistd.hq>
 
 #define INIT_TAG 1
 #define DIE_TAG 2
@@ -117,6 +117,7 @@ void slave(int my_id) {
 
             MPI_Cancel(&request);
 
+            /*
             MPI_Test(&request, &flag, &status);
 
             if (flag) {
@@ -124,6 +125,7 @@ void slave(int my_id) {
 
                 return;
             }
+            */
 
             // final work?
             if (msg == my_id*2) {
