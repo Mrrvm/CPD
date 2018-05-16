@@ -3,15 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define INIT_TAG 1
-#define DIE_TAG 2
-#define WORK_TAG 3
-#define NO_WORK_TAG 4
-#define SOLUTION_TAG 6
-
-#define IDLE 100
-#define WORKING 101
-
+enum tags {INIT_TAG = 1, DIE_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG};
+enum slave_st {IDLE = 100, WORKING, REQUEST};
 
 void exit_colony(int ntasks) {
     int id, msg = 0;
@@ -24,21 +17,24 @@ void exit_colony(int ntasks) {
 void master() {
 
     MPI_Status status;
-    int ntasks, id, msg, top;
+    int ntasks, id, msg, slave;
+    int robin = 1;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     int idle_slaves = ntasks;
     int slaves_state[ntasks] = {0};
+    int work[20] = {0}, top;
+    int play;
 
     // Prepare initial work pool
-    int nwork = 10;
+    int top = 15;
 
     // Distribute initial work
     for (id = 1; id < ntasks; ++id) {
         // get work from work pool
-        top = nwork--;
+        play = work[--top];
 
         // send work
-        MPI_Send(&top, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+        MPI_Send(&play, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
         printf("Master sent work %d to Process %d\n", top, id);
 
         slaves_state[id] = 1;
@@ -49,24 +45,78 @@ void master() {
 
         MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        if(status.MPI_TAG == NO_WORK_TAG) 
-            // Send work from queue
-            // Or,
-            // Gets work from other slave (send msg RED_TAG)
+        slave = status.MPI_Status;
+
+        if(status.MPI_TAG == NO_WORK_TAG)
+
+            if (top > 0)
+                /* There is available work */
+                play = work[--top];
+
+                /* Send work */
+                MPI_Send(&play, 1, MPI_INT, slave, WORK_TAG, MPI_COMM_WORLD);
+
+                /* If Redistribute */
+                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+
+                if (robin != -1) {
+
+                    MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
+                    slaves_state[robin] = REQUEST;
+                }
+                else {
+
+                    robin = 1;
+                }
+
+            }
+            else {
+                /* There is no work available */
+                idle++;
+                slaves_state[slave] = IDLE;
+
+                /* Redistribute (if has not passed threshold) */
+                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+
+                if (robin != -1) {
+
+                    MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
+                    slaves_state[robin] = REQUEST;
+                }
+                else {
+
+                    robin = 1;
+                }
+            }
         }
         else if(status.MPI_TAG == SOLUTION_TAG) {
+
             // Sends DIE_TAG by broadcast
             exit_colony(ntasks);
-            
         }
         else if(status.MPI_TAG == WORK_TAG) {
-            // Saves on queue
-            // Or,
-            // Sends immediately to the neeedy slave
+            play = msg;
+
+            if (idle > 0) {
+                /* Find one idle slave */
+                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+
+                /* if (robin == -1) ????*/
+
+                /* Send work */
+                MPI_Send(&play, 1, MPI_INT, robin, WORK_TAG, MPI_COMM_WORLD);
+
+                slaves_state[robin] = WORKING;
+                idle--;
+            }
+            else {
+                /* Add to work queue */
+
+                work[top++] = play;
+            }
         }
 
     }
-
 
 
 
@@ -129,6 +179,21 @@ void master() {
 
 }
 
+void round_robin(int *slaves_state, int ntasks, int state, int begin) {
+  int id, robin = begin;
+
+  for (id = 1; id < ntasks; ++id) {
+      robin = (robin == ntasks-1) ? (1) : (robin+1);
+
+      if (slaves_state[robin] == state) {
+
+          return robin;
+      }
+  }
+
+  return -1;
+}
+
 void slave(int my_id) {
 
     MPI_Status status;
@@ -148,7 +213,7 @@ void slave(int my_id) {
         if(flag == 1) {
             if (status.MPI_TAG == WORK_TAG) {
                 // Probe msg to get size
-                // Receive work 
+                // Receive work
                 printf("Process %d got work %d\n", my_id, msg);
                 state = WORKING;
             }
@@ -172,7 +237,7 @@ void slave(int my_id) {
         }
 
         if(state == WORKING) {
-            // Do work    
+            // Do work
 
             // If found solution
             if(solution) {
@@ -182,7 +247,7 @@ void slave(int my_id) {
             // When ending
             if(ended) {
                 // Send msg NO_WORK_TAG to master
-                state = IDLE;     
+                state = IDLE;
             }
         }
     }
