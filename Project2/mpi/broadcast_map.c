@@ -100,6 +100,13 @@ void restore_from_history(mask_t *mask, info_t *history, int history_len) {
     }
 }
 
+void rewrite_history(int index, int value, mask_t *mask) {
+    if (index > mask->history_len) {
+        printf("Invalid index to rewrite");
+    }
+    mask->history[index].v = value;
+}
+
 bool advance_cell(int i, int j) {
     int n = clear_cell(i, j, gMOAS->mask);
     while (++n <= gMOAS->n) {
