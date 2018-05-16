@@ -45,7 +45,7 @@ void print_grid() {
     printf("\n");
 }
 
-void read_file(const char *filename, int ntasks) {
+void read_file(const char *filename, int ntasks, int my_id) {
     FILE *sudoku_file;
     int box_size;
     int num;
@@ -61,9 +61,8 @@ void read_file(const char *filename, int ntasks) {
         fprintf(stderr, "Could not read file\n");
         exit_colony(ntasks);
     }
-    for (id = 1; id < ntasks; ++id) {
-        MPI_Send(&box_size, 1, MPI_INT, id, INIT_TAG, MPI_COMM_WORLD);
-    }
+    MPI_Bcast(&box_size, 1, MPI_INT, my_id, MPI_COMM_WORLD);
+    
 
     gMOAS = (moas_t *)malloc(sizeof(moas_t));
     gMOAS->box_size = box_size;
@@ -87,9 +86,7 @@ void read_file(const char *filename, int ntasks) {
             fscanf(sudoku_file, "%d", &num);
             //set_cell(x, y, num);
             gMOAS->known[x][y] = num;
-            for (id = 1; id < ntasks; ++id) {
-                MPI_Send(&num, 1, MPI_INT, id, INIT_TAG, MPI_COMM_WORLD);
-            }
+            MPI_Bcast(&num, 1, MPI_INT, my_id, MPI_COMM_WORLD);
         }
     }
 
@@ -98,11 +95,10 @@ void read_file(const char *filename, int ntasks) {
 
 void build_map() {
 
-    MPI_Status status;
     int x, y, n, msg;
 
     gMOAS = (moas_t *)malloc(sizeof(moas_t));
-    MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+    MPI_Bcast(&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
     gMOAS->box_size = msg;
     gMOAS->n = msg * msg;
     /* Init our bit mask */
@@ -120,7 +116,7 @@ void build_map() {
         gMOAS->known[x] = (int *)calloc(gMOAS->n, sizeof(int));
         gMOAS->grid[x] = (int *)calloc(gMOAS->n, sizeof(int));
         for (y = 0; y < gMOAS->n; y++) {
-            MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            MPI_Bcast(&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
             //set_cell(x, y, msg);
             gMOAS->known[x][y] = msg;
         }
@@ -128,14 +124,14 @@ void build_map() {
 }
 
 
-void master(){
+void master(int my_id){
 
-    int ntasks, id;
+    int ntasks;
     MPI_Status status;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
 
     // Read file and send to slaves
-    read_file("testfiles/4x4.txt", ntasks);
+    read_file("testfiles/4x4.txt", ntasks, my_id);
 
     print_grid();
 
@@ -143,7 +139,7 @@ void master(){
     exit_colony(ntasks);
 }
 
-void slave() {
+void slave(int my_id) {
 
     MPI_Status status;
     int msg;
@@ -169,9 +165,9 @@ int main (int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
     if (my_id == 0) {
-        master();
+        master(my_id);
     } else {
-        slave();
+        slave(my_id);
     }
     MPI_Finalize();
     return 0;
