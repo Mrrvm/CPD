@@ -79,7 +79,9 @@ void master(){
 void slave(int my_id) {
 
     MPI_Status status;
+    MPI_Request request;
     int msg = 0, top, *play;
+    int i, flag;
 
     while(1) {
         MPI_Recv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -90,18 +92,43 @@ void slave(int my_id) {
             return;
         }
         else if(status.MPI_TAG == WORK_TAG) {
+            top = msg;
+
             printf("Process %d got work %d\n", my_id, msg);
 
-            // do work
-            sleep(1);
+            MPI_Irecv(&msg, 1, MPI_INT, 0, DIE_TAG, MPI_COMM_WORLD, &request);
+
+            // do work (watch out for order)
+            for (i = 0; i < 3; i++) {
+                MPI_Test(request, &flag, &status);
+
+                if (flag) {
+                  printf("Process %d DIED\n", my_id);
+
+                  return;
+                }
+
+                sleep(1);
+                printf("Process %d id work %d/%d\n", my_id, i, top);
+            }
+
+            MPI_Cancel(request);
+
+            MPI_Test(request, &flag, &status);
+
+            if (flag) {
+                printf("Process %d DIED\n", my_id);
+
+                return;
+            }
 
             // final work?
             if (msg == my_id*2) {
-                printf("Process %d found solution %d!\n", my_id, msg);
+                printf("Process %d found solution %d!\n", my_id, top);
 
                 MPI_Send(&msg, 1, MPI_INT, 0, FINISH_TAG, MPI_COMM_WORLD);
             } else {
-                printf("Process %d finished work %d\n", my_id, msg);
+                printf("Process %d finished work %d\n", my_id, top);
 
                 MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
             }
