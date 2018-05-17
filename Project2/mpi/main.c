@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define REDIST_ON;
+
 #define INIT_BUFF 6
 #define WORK_TRESH 4
 #define STEP_SIZE 10
@@ -480,6 +482,7 @@ void master(const char * filename) {
                 send_work(&play, slave);
 
                 // If Redistribute
+                #ifdef REDIST_ON
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
@@ -493,6 +496,7 @@ void master(const char * filename) {
                         robin = 1;
                     }
                 }
+                #endif
 
             }
             else {
@@ -509,6 +513,7 @@ void master(const char * filename) {
                     return;
                 }
 
+                #ifdef REDIST_ON
                 // Redistribute (if has not passed threshold)
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
@@ -524,6 +529,7 @@ void master(const char * filename) {
                         robin = 1;
                     }
                 }
+                #endif
             }
         }
         else if(status.MPI_TAG == SOLUTION_TAG) {
