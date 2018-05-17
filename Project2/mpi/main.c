@@ -592,8 +592,8 @@ void slave(int my_id) {
                 work = receive_work(0, msg);
                 // Sets state to the beggining of history
                 restore_from_history(work->history, work->history_len);
-                init_root = work->history_len;
-                init_pos = gMOAS->mask->history[index].x * gMOAS->n + gMOAS->mask->history[index].y + 1;
+                init_root = work->history_len - 1;
+                init_pos = gMOAS->mask->history[init_root].x * gMOAS->n + gMOAS->mask->history[init_root].y + 1;
 
                 state = WORKING;
             }
@@ -603,7 +603,15 @@ void slave(int my_id) {
                 // find current root
                 root = root_history(init_root);
 
-                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
+                if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+                    
+                    state = WORKING;
+                }
+                else if(root != -1) {
+
+                    state = REQUEST; 
+                }
+                else {
                     // make copy of history until root_history
 
                     // send work to master
@@ -612,9 +620,13 @@ void slave(int my_id) {
                     rewrite_history(root);
 
                     printf("Process %d redistributed work\n", my_id);
+                    state = WORKING;
                 }
                 */
-                state = WORKING;
+                }
+
+                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
+                    
             }
             else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
@@ -627,7 +639,7 @@ void slave(int my_id) {
             flag = -1;
         }
 
-        if(state == WORKING) {
+        if(state != IDLE) {
             /*
             // Do work
 
@@ -651,6 +663,34 @@ void slave(int my_id) {
             }
             */
 
+        }
+
+        if (state == REQUEST) {
+            /*
+                // Redistribute work and send to master
+                // find current root
+                root = root_history(init_root);
+
+                if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+                    
+                    state = WORKING;
+                }
+                else if(root != -1) {
+
+                    state = REQUEST; 
+                }
+                else {
+                    // make copy of history until root_history
+
+                    // send work to master
+                    send_work(&play, 0);
+                    // change history
+                    rewrite_history(root);
+
+                    printf("Process %d redistributed work\n", my_id);
+                    state = WORKING;
+                }
+                */
         }
     }
 }
