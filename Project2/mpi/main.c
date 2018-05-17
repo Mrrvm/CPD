@@ -113,13 +113,14 @@ void restore_from_history(info_t *history, int history_len) {
     }
 }
 
-void copy_history(info_t *history, int history_len) {
+void copy_history(work_t *work) {
     mask_t *mask = gMOAS->mask;
-    int i = 0;
-    history = calloc(history_len, sizeof(info_t));
-    for(i=0; i < history_len; i++) {
-        history[i] = mask->history[i];
+    int i = 0, len = mask->history_len;
+    work->history = calloc(len, sizeof(info_t));
+    for(i=0; i < len; i++) {
+        work->history[i] = mask->history[i];
     }
+    work->history_len = len;
 }
 
 void rewrite_history(int index) {
@@ -154,7 +155,6 @@ bool advance_cell(int i, int j) {
         if (is_available(i, j, n)) {
             set_cell(i, j, n);
             add_to_history(i, j, n);
-            printf("n=%d is available\n", n);
             return true;
         }
     }
@@ -275,8 +275,8 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
         if (pos >= total) {
               // save this history 
-              print_history(mask->history, mask->history_len);
-              copy_history(stack[*top].history, stack[*top].history_len);
+              //print_history(mask->history, mask->history_len);
+              copy_history(&stack[*top]);
               (*top)++;
 
               // backtrack 
@@ -288,7 +288,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
             ++pos;
-            printf("Advancing on house %d\n", pos);
+            
         } else {
             if (mask->history_len == 0) {
                 break;
@@ -447,7 +447,7 @@ void master(const char * filename) {
     read_file(filename, ntasks);
     // Prepare initial work pool
     stack = initial_work(ntasks, &top, &wk_size);
-    //print_work_stack(ntasks, stack);
+    print_work_stack(ntasks, stack);
 /*
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
