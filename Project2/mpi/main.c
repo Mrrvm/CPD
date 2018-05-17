@@ -150,7 +150,6 @@ int root_history(int root) {
 bool advance_cell(int i, int j) {
     mask_t *mask = gMOAS->mask;
     int n = clear_cell(i, j);
-    printf("Last value %d \n", n);
     while (++n <= gMOAS->n) {
         if (is_available(i, j, n)) {
             set_cell(i, j, n);
@@ -227,7 +226,7 @@ void print_history(info_t *history, int length) {
     int i = 0;
     printf("History length %d\n", length);
     for(i=0; i<length; i++) {
-        printf("work[%d][%d] = %d\n", history[i].x, history[i].y, history[i].v);
+        printf("map[%d][%d] = %d\n", history[i].x, history[i].y, history[i].v);
     }
 }
 
@@ -242,7 +241,7 @@ void print_work_stack(int ntasks, work_t *stack) {
 
 work_t *initial_work(int ntasks, int *top, int *size) {
 
-    int total = 1, acc = gMOAS->box_size;
+    int total = 1, acc = gMOAS->n;
     work_t *stack;
     int pos = 0;
     mask_t *mask = gMOAS->mask;
@@ -255,6 +254,14 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         total++;
     }
 
+    while(1) {
+        if(gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
+            total++;
+        } else {
+            break;
+        }
+    }
+
     *size = acc*2;
     stack = (work_t*) calloc (*size, sizeof(work_t));
     *top = 0;
@@ -265,19 +272,20 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         while (pos < total && gMOAS->known[pos / gMOAS->n][pos % gMOAS->n]) {
             ++pos;
         }
-        printf("pim\n");
+
         if (pos >= total) {
               // save this history 
-              print_history(mask->history);
+              print_history(mask->history, mask->history_len);
               copy_history(stack[*top].history, stack[*top].history_len);
               (*top)++;
 
               // backtrack 
               pos = mask->history[mask->history_len - 1].x * gMOAS->n +
                     mask->history[mask->history_len - 1].y;
+
               remove_last_from_history();
         }
-        printf("pom\n");
+
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
             ++pos;
             printf("Advancing on house %d\n", pos);
@@ -289,7 +297,6 @@ work_t *initial_work(int ntasks, int *top, int *size) {
                   mask->history[mask->history_len - 1].y;
             remove_last_from_history();
         }
-        printf("pum\n");
     }
 
     return stack;
@@ -440,7 +447,7 @@ void master(const char * filename) {
     read_file(filename, ntasks);
     // Prepare initial work pool
     stack = initial_work(ntasks, &top, &wk_size);
-    print_work_stack(ntasks, stack);
+    //print_work_stack(ntasks, stack);
 /*
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
@@ -569,7 +576,7 @@ void slave(int my_id) {
     MPI_Request request;
     int msg = 0, top, *play;
     int i, flag = -1, state = IDLE, size;
-    int init_root, root, int_pos, pos, res, history_len;
+    int init_root, root, init_pos, pos, res, history_len;
     work_t *work;
 
     // Receive map
@@ -593,7 +600,7 @@ void slave(int my_id) {
                 // Sets state to the beggining of history
                 restore_from_history(work->history, work->history_len);
                 init_root = work->history_len;
-                init_pos = gMOAS->mask->history[index].x * gMOAS->n + gMOAS->mask->history[index].y + 1;
+                init_pos = gMOAS->mask->history[init_root].x * gMOAS->n + gMOAS->mask->history[init_root].y + 1;
 
                 state = WORKING;
             }
