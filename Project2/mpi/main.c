@@ -569,7 +569,7 @@ void slave(int my_id) {
     MPI_Request request;
     int msg = 0, top, *play;
     int i, flag = -1, state = IDLE, size;
-    int init_root, root, pos, res, history_len;
+    int init_root, root, int_pos, pos, res, history_len;
     work_t *work;
 
     // Receive map
@@ -593,6 +593,7 @@ void slave(int my_id) {
                 // Sets state to the beggining of history
                 restore_from_history(work->history, work->history_len);
                 init_root = work->history_len;
+                init_pos = gMOAS->mask->history[index].x * gMOAS->n + gMOAS->mask->history[index].y + 1;
 
                 state = WORKING;
             }
@@ -629,7 +630,9 @@ void slave(int my_id) {
         if(state == WORKING) {
             /*
             // Do work
-            res = solve_nsteps(init_root, &pos, gMOAS->n, STEP_SIZE);
+
+            res = solve_nsteps(init_pos, &pos, gMOAS->n * gMOAS->n, STEP_SIZE);
+
 
             if (res == 0) {
                 state = IDLE;
