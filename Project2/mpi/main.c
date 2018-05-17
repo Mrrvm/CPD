@@ -349,9 +349,9 @@ void build_map() {
         }
     }
 
-    //MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    //gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
-    //gMOAS->mask->history_len = 0;
+    MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
+    gMOAS->mask->history_len = 0;
 }
 
 
@@ -399,8 +399,8 @@ void read_file(const char *filename, int ntasks) {
         }
     }
 
-    // ?????
-    //MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
     gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
     gMOAS->mask->history_len = 0;
     fclose(sudoku_file);
@@ -460,6 +460,9 @@ void master(const char * filename) {
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
         // get work from work pool
+        if (top == 0) {
+            break;
+        }
         work = &(stack[--top]);
 
         // send work
@@ -609,13 +612,14 @@ void slave(int my_id) {
 
                 printf("Process %d got work of size %d\n", my_id, msg);
                 work = receive_work(0, msg);
-                if(my_id == 2) {
+                if(my_id == 1) {
                     print_history(work->history, work->history_len);
                 }
+                
                 // Sets state to the beggining of history
-                restore_from_history(work->history, work->history_len);
                 init_root = work->history_len - 1;
-                init_pos = gMOAS->mask->history[init_root].x * gMOAS->n + gMOAS->mask->history[init_root].y + 1;
+                init_pos = work->history[init_root].x * gMOAS->n + work->history[init_root].y + 1;
+                restore_from_history(work->history, work->history_len);
 
                 state = WORKING;
             }
@@ -645,10 +649,6 @@ void slave(int my_id) {
                     state = WORKING;
                 }
                 */
-                }
-
-                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
-
             }
             else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
