@@ -48,22 +48,21 @@ typedef struct work_type {
 moas_t *gMOAS;
 int gDONE;
 
-void print_grid(mask_t *mask);
-void free_gMOAS();
-void build_map();
 
 int square(int i, int j) {
     return (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
 }
 
-void set_cell(int i, int j, int n, mask_t *mask) {
+void set_cell(int i, int j, int n) {
+    mask_t *mask = gMOAS->mask;
     mask->grid[i][j] = n;
     mask->rows[i] |= mask->bits[n];
     mask->cols[j] |= mask->bits[n];
     mask->squares[square(i, j)] |= mask->bits[n];
 }
 
-int clear_cell(int i, int j, mask_t *mask) {
+int clear_cell(int i, int j) {
+    mask_t *mask = gMOAS->mask;
     int n = mask->grid[i][j];
     mask->grid[i][j] = 0;
     mask->rows[i] &= ~mask->bits[n];
@@ -72,7 +71,8 @@ int clear_cell(int i, int j, mask_t *mask) {
     return n;
 }
 
-bool is_available(int i, int j, int n, mask_t *mask) {
+bool is_available(int i, int j, int n) {
+    mask_t *mask = gMOAS->mask;
     return (mask->rows[i] & mask->bits[n]) == 0 &&
            (mask->cols[j] & mask->bits[n]) == 0 &&
            (mask->squares[square(i, j)] & mask->bits[n]) == 0;
@@ -85,37 +85,42 @@ void exit_colony(int ntasks) {
     }
 }
 
-void add_to_history(int i, int j, int value, mask_t *mask) {
+void add_to_history(int i, int j, int value) {
+    mask_t *mask = gMOAS->mask;
     mask->history[mask->history_len].x = i;
     mask->history[mask->history_len].y = j;
     mask->history[mask->history_len].v = value;
     mask->history_len++;
 }
 
-void remove_last_from_history(mask_t *mask) {
+void remove_last_from_history() {
+    mask_t *mask = gMOAS->mask;
     mask->history_len = (mask->history_len == 0) ? 0 : mask->history_len - 1;
 }
 
-void clear_history(mask_t *mask) {
+void clear_history() {
+    mask_t *mask = gMOAS->mask;
     mask->history_len = 0;
 }
 
-void restore_from_history(mask_t *mask, info_t *history, int history_len) {
+void restore_from_history(info_t *history, int history_len) {
+    mask_t *mask = gMOAS->mask;
     for (int i = 0; i < history_len; i++) {
-        clear_cell(history[i].x, history[i].y, gMOAS->mask);
-        set_cell(history[i].x, history[i].y, history[i].v, gMOAS->mask);
-        add_to_history(history[i].x, history[i].y, history[i].v, gMOAS->mask);
+        clear_cell(history[i].x, history[i].y);
+        set_cell(history[i].x, history[i].y, history[i].v);
+        add_to_history(history[i].x, history[i].y, history[i].v);
     }
 }
 
-void copy_history(mask_t *mask, info_t **history, int *history_len) {
+void copy_history(info_t **history, int *history_len) {
 
     *history = calloc(gMOAS->n_empty, sizeof(info_t));
 
 
 }
 
-void rewrite_history(int index, mask_t *mask) {
+void rewrite_history(int index) {
+    mask_t *mask = gMOAS->mask;
     if (index > mask->history_len) {
         printf("Invalid index to rewrite");
     }
@@ -126,9 +131,9 @@ void rewrite_history(int index, mask_t *mask) {
     (mask->history[index].v)++;
 }
 
-int root_history(mask_t *mask, int root) {
+int root_history(int root) {
     int i;
-
+    mask_t *mask = gMOAS->mask;
     /* gets first history whose value is not the last possible */
     for (i = root; i < mask->history_len; i++) {
 
@@ -140,20 +145,53 @@ int root_history(mask_t *mask, int root) {
 }
 
 bool advance_cell(int i, int j) {
-    int n = clear_cell(i, j, gMOAS->mask);
+    mask_t *mask = gMOAS->mask;
+    int n = clear_cell(i, j, mask);
     while (++n <= gMOAS->n) {
-        if (is_available(i, j, n, gMOAS->mask)) {
-            set_cell(i, j, n, gMOAS->mask);
-            add_to_history(i, j, n, gMOAS->mask);
+        if (is_available(i, j, n)) {
+            set_cell(i, j, n);
+            add_to_history(i, j, n);
             return true;
         }
     }
     return false;
 }
 
+void print_grid() {
+    int i, j;
+    mask_t *mask = gMOAS->mask;
+    for (i = 0; i < gMOAS->n; i++) {
+        for (j = 0; j < gMOAS->n; j++) {
+            if (gMOAS->known[i][j]) {
+                printf("%2d ", gMOAS->known[i][j]);
+            } else {
+                printf("%2d ", mask->grid[i][j]);
+            }
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void free_gMOAS() {
+    int i;
+    for (i = 0; i < gMOAS->n; i++) {
+        free(gMOAS->known[i]);
+        free((gMOAS->mask)->grid[i]);
+    }
+    free(gMOAS->known);
+    free(gMOAS->mask->grid);
+    free(gMOAS->mask->rows);
+    free(gMOAS->mask->cols);
+    free(gMOAS->mask->squares);
+    free(gMOAS->mask->bits);
+    free(gMOAS->mask->history);
+    free(gMOAS);
+}
+
 int solve_nsteps(int root, int *pos, int total, int nsteps) {
     int i;
-
+    mask_t *mask = gMOAS->mask;
     for (i = 0; i < nsteps; i++) {
         while (*pos < total && gMOAS->known[*pos / gMOAS->n][*pos % gMOAS->n]) {
             ++(*pos);
@@ -166,12 +204,12 @@ int solve_nsteps(int root, int *pos, int total, int nsteps) {
         if (advance_cell(*pos / gMOAS->n, *pos % gMOAS->n)) {
             ++(*pos);
         } else {
-            if (gMOAS->mask->history_len == root) {
+            if (mask->history_len == root) {
                 return 0;
             }
-            (*pos) = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
-                  gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
-            remove_last_from_history(gMOAS->mask);
+            (*pos) = mask->history[mask->history_len - 1].x * gMOAS->n +
+                  mask->history[mask->history_len - 1].y;
+            remove_last_from_history();
         }
     }
 
@@ -180,12 +218,18 @@ int solve_nsteps(int root, int *pos, int total, int nsteps) {
 
 work_t *initial_work(int ntasks, int *top, int *size) {
 
-    int depth = 1, acc = gMOAS->box_size;
+    int total = 1, acc = gMOAS->box_size;
     work_t *work;
     int pos = 0;
+    mask_t *mask = gMOAS->mask;
 
-    while (acc < (ntasks + INIT_BUFF) && depth <= gMOAS->box_size)
-        acc *= (gMOAS->box_size - depth++);
+    /* Calculate number of starter possibilities according to ntasks */
+    while (acc < (ntasks + INIT_BUFF) && total < gMOAS->n) {
+        if(!gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
+            acc *= (gMOAS->n - total);
+        }
+        total++;
+    }
 
     *size = acc*2;
     work = (work_t*) calloc (*size, sizeof(work_t));
@@ -198,24 +242,24 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         }
         if (pos >= total) {
               /* save this history */
-              copy_history(gMOAS->mask, &(work[*top].history), &(work[*top].history_len));
+              copy_history(&(work[*top].history), &(work[*top].history_len));
               (*top)++;
 
               /* backtrack */
-              pos = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
-                    gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
-              remove_last_from_history(gMOAS->mask);
+              pos = mask->history[mask->history_len - 1].x * gMOAS->n +
+                    mask->history[mask->history_len - 1].y;
+              remove_last_from_history();
         }
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
             ++pos;
         } else {
-            if (gMOAS->mask->history_len == 0) {
+            if (mask->history_len == 0) {
                 break;
             }
-            pos = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
-                  gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
-            remove_last_from_history(gMOAS->mask);
+            pos = mask->history[mask->history_len - 1].x * gMOAS->n +
+                  mask->history[mask->history_len - 1].y;
+            remove_last_from_history();
         }
     }
 
@@ -243,6 +287,88 @@ void round_robin(int *slaves_state, int ntasks, int state, int begin) {
   }
 
   return -1;
+}
+
+void build_map() {
+    int box_size, num, i, j, n_empty;
+
+    MPI_Bcast(&box_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    gMOAS = (moas_t *)malloc(sizeof(moas_t));
+    gMOAS->box_size = box_size;
+    gMOAS->n = box_size * box_size;
+    gMOAS->known = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask = (mask_t *)malloc(sizeof(mask_t));
+    gMOAS->mask->grid = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask->rows = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->cols = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->squares = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->bits = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    for (i = 1; i < gMOAS->n + 1; i++) {
+        gMOAS->mask->bits[i] = 1 << i;
+    }
+    for (i = 0; i < gMOAS->n; i++) {
+        gMOAS->known[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        gMOAS->mask->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        for (j = 0; j < gMOAS->n; j++) {
+            MPI_Bcast(&num, 1, MPI_INT, 0, MPI_COMM_WORLD);
+            set_cell(i, j, num, gMOAS->mask);
+            gMOAS->known[i][j] = num;
+        }
+    }
+
+    MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
+}
+
+
+void read_file(const char *filename, int ntasks) {
+    FILE *sudoku_file;
+    int box_size, num, i, j;
+
+    sudoku_file = fopen(filename, "re");
+    if (sudoku_file == NULL) {
+        fprintf(stderr, "Could not open file\n");
+        exit_colony(ntasks);
+    }
+
+    if (fscanf(sudoku_file, "%d", &box_size) == EOF) {
+        fprintf(stderr, "Could not read file\n");
+        exit_colony(ntasks);
+    }
+    MPI_Bcast(&box_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    gMOAS = (moas_t *)malloc(sizeof(moas_t));
+    gMOAS->box_size = box_size;
+    gMOAS->n = box_size * box_size;
+    gMOAS->n_empty = gMOAS->n * gMOAS->n;
+    gMOAS->known = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask = (mask_t *)malloc(sizeof(mask_t));
+    gMOAS->mask->grid = (int **)calloc(gMOAS->n, sizeof(int *));
+    gMOAS->mask->rows = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->cols = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->squares = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    gMOAS->mask->bits = calloc(gMOAS->n + 1, sizeof(uint128_t));
+    for (i = 1; i < gMOAS->n + 1; i++) {
+        gMOAS->mask->bits[i] = 1 << i;
+    }
+    for (i = 0; i < gMOAS->n; i++) {
+        gMOAS->known[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        gMOAS->mask->grid[i] = (int *)calloc(gMOAS->n, sizeof(int));
+        for (j = 0; j < gMOAS->n; j++) {
+            fscanf(sudoku_file, "%d", &num);
+            set_cell(i, j, num, gMOAS->mask);
+            gMOAS->known[i][j] = num;
+            if (num != 0) {
+                gMOAS->n_empty--;
+            }
+            MPI_Bcast(&num, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        }
+    }
+
+    MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
+    fclose(sudoku_file);
 }
 
 void master() {
@@ -387,6 +513,9 @@ void slave(int my_id) {
     int init_root, root, pos, res;
     work_t work;
 
+    build_map();
+    print_grid();
+
     while (1) {
 
         if(flag != 0) {
@@ -401,8 +530,8 @@ void slave(int my_id) {
                 // Probe msg to get size
                 MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
                 MPI_Get_count(&status, MPI_INT, &size);
-                // Alloc work with size
-                // Set msg to work data
+                // Alloc history with size
+
                 printf("Process %d got work %d\n", my_id, msg);
 
                 // Sets state to the beggining of history
@@ -414,15 +543,15 @@ void slave(int my_id) {
             else if (status.MPI_TAG == RED_TAG && state == WORKING) {
                 // Redistribute work and send to master
                 // find current root
-                root = root_history(gMOAS->mask, init_root);
+                root = root_history(init_root);
 
-                if (root != -1 && ((gMOAS->n) ^ 2 - root) > DEPTH_TRESH) {
+                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
                   // make copy of history until root_history
 
                   // send work to master
 
                   // change history
-                  rewrite_history(root, gMOAS->mask);
+                  rewrite_history(root);
 
                   printf("Process %d redistributed work\n", my_id);
                 }
@@ -461,7 +590,7 @@ void slave(int my_id) {
 
                 }
 
-                clear_history(gMOAS->mask);
+                clear_history();
             }
 
         }
