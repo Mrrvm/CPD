@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define REDIST_ON;
+//#define REDIST_ON 
 
 #define INIT_BUFF 6
 #define WORK_TRESH 4
@@ -410,6 +410,7 @@ void read_file(const char *filename, int ntasks) {
 void send_work(work_t *work, int id) {
 
     int size = work->history_len, i;
+    printf("Sending size %d\n", size);
     MPI_Send(&size, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
 
     for(i = 0; i< size; i++) {
@@ -421,16 +422,20 @@ void send_work(work_t *work, int id) {
 
 work_t *receive_work(int id, int size) {
     work_t *work;
-    int i;
+    int i, n;
     MPI_Status status;
 
     work = (work_t*) malloc (sizeof(work_t));
     work->history = (info_t *)calloc(size, sizeof(info_t));
     work->history_len = size;
     for(i=0; i<size; i++) {
-        MPI_Recv(&(work->history[i].x), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
-        MPI_Recv(&(work->history[i].y), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
-        MPI_Recv(&(work->history[i].v), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        work->history[i].x = n;
+        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        work->history[i].y = n;
+        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        work->history[i].v = n;
+        printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x, work->history[i].y, work->history[i].v);
     }
     return work;
 }
@@ -588,7 +593,7 @@ void slave(int my_id) {
 
     // Receive map
     build_map();
-    print_grid();
+    //print_grid();
 
     while (1) {
 
@@ -604,6 +609,9 @@ void slave(int my_id) {
 
                 printf("Process %d got work of size %d\n", my_id, msg);
                 work = receive_work(0, msg);
+                if(my_id == 2) {
+                    print_history(work->history, work->history_len);
+                }
                 // Sets state to the beggining of history
                 restore_from_history(work->history, work->history_len);
                 init_root = work->history_len - 1;
