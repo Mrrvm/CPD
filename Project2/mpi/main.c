@@ -407,20 +407,20 @@ void read_file(const char *filename, int ntasks) {
 }
 
 
-void send_work(work_t *work, int id) {
+void send_work(info_t *history, int size, int id, int tag) {
 
-    int size = work->history_len, i;
+    int i;
     printf("Sending size %d\n", size);
-    MPI_Send(&size, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+    MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
 
     for(i = 0; i< size; i++) {
-        MPI_Send(&(work->history[i].x), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
-        MPI_Send(&(work->history[i].y), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
-        MPI_Send(&(work->history[i].v), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+        MPI_Send(&(history[i].x), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
+        MPI_Send(&(history[i].y), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
+        MPI_Send(&(history[i].v), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
     }
 }
 
-work_t *receive_work(int id, int size) {
+work_t *receive_work(int id, int size, int tag) {
     work_t *work;
     int i, n;
     MPI_Status status;
@@ -429,11 +429,11 @@ work_t *receive_work(int id, int size) {
     work->history = (info_t *)calloc(size, sizeof(info_t));
     work->history_len = size;
     for(i=0; i<size; i++) {
-        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].x = n;
-        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].y = n;
-        MPI_Recv(&n, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].v = n;
         printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x, work->history[i].y, work->history[i].v);
     }
@@ -457,6 +457,9 @@ void master(const char * filename) {
     stack = initial_work(ntasks, &top, &wk_size);
     print_work_stack(ntasks, stack);
 
+    for (slave = 1; slave < ntasks; ++slave) 
+        slaves_state[slave] = IDLE;
+
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
         // get work from work pool
@@ -466,28 +469,28 @@ void master(const char * filename) {
         work = &(stack[--top]);
 
         // send work
-        send_work(work, slave);
+        send_work(work->history, work->history_len, slave, WORK_TAG);
         printf("Master sent work %d to Process %d\n", top, slave);
 
         slaves_state[slave] = 1;
         idle_slaves--;
     }
 
-    /*
+    
     while (1) {
 
         MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        slave = status.MPI_Status;
+        slave = status.MPI_SOURCE;
 
-        if (status.MPI_TAG == NO_WORK_TAG)
+        if (status.MPI_TAG == NO_WORK_TAG) {
 
-            if (top > 0)
+            if (top > 0) {
                 // There is available work
-                play = work[--top];
+                work = &stack[--top];
 
                 // Send work
-                send_work(&play, slave);
+                send_work(work->history, work->history_len, slave, WORK_TAG);
 
                 // If Redistribute
                 #ifdef REDIST_ON
@@ -509,13 +512,15 @@ void master(const char * filename) {
             }
             else {
                 // There is no work available
-                idle++;
+                idle_slaves++;
                 slaves_state[slave] = IDLE;
 
-                if (idle == ntasks-1) {
+                if (idle_slaves == ntasks-1) {
                     // No work here, no slaves working, its vacation time!
+                    // Free strucutures
 
                     // No solution found
+                    printf("No solution\n");
 
                     exit_colony(ntasks);
                     return;
@@ -542,29 +547,36 @@ void master(const char * filename) {
         }
         else if(status.MPI_TAG == SOLUTION_TAG) {
 
+            work = receive_work(slave, msg, SOLUTION_TAG);
+            printf("ienfpifnpren\n");
+            print_history(work->history, work->history_len);
+            // Save to grid and print
+
             // Sends DIE_TAG by broadcast
             exit_colony(ntasks);
+            return;
         }
         else if(status.MPI_TAG == WORK_TAG) {
-            play = msg;
+            
+            work = receive_work(slave, msg, WORK_TAG);
 
             // Handle work redistributed
-            if (idle > 0) {
+            if (idle_slaves > 0) {
                 // Find one idle slave
                 robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                 // if (robin == -1) ???
 
                 // Send work
-                send_work(&play, robin);
+                send_work(work->history, work->history_len, robin, WORK_TAG);
 
                 slaves_state[robin] = WORKING;
-                idle--;
+                idle_slaves--;
             }
             else {
                 // Add to work queue
 
-                work[top++] = play;
+                stack[top++] = *work;
             }
 
             // Slave that shared work state.
@@ -573,13 +585,14 @@ void master(const char * filename) {
 
                 MPI_Send(&msg, 1, MPI_INT, slave, RED_TAG, MPI_COMM_WORLD);
                 slaves_state[slave] = REQUEST;
-            } else {
+            } 
+            else {
 
                 slaves_state[slave] = WORKING;
             }
         }
 
-    }*/
+    }
     exit_colony(ntasks);
 
 }
@@ -611,15 +624,15 @@ void slave(int my_id) {
             if (status.MPI_TAG == WORK_TAG) {
 
                 printf("Process %d got work of size %d\n", my_id, msg);
-                work = receive_work(0, msg);
-                if(my_id == 1) {
-                    print_history(work->history, work->history_len);
-                }
+                work = receive_work(0, msg, WORK_TAG);
+                
                 
                 // Sets state to the beggining of history
                 init_root = work->history_len - 1;
                 init_pos = work->history[init_root].x * gMOAS->n + work->history[init_root].y + 1;
+                pos = init_pos;
                 restore_from_history(work->history, work->history_len);
+                print_grid();
 
                 state = WORKING;
             }
@@ -662,28 +675,27 @@ void slave(int my_id) {
         }
 
         if(state != IDLE) {
-            /*
+            
             // Do work
-
             res = solve_nsteps(init_pos, &pos, gMOAS->n * gMOAS->n, STEP_SIZE);
-
 
             if (res == 0) {
                 state = IDLE;
 
                 if (gDONE) {
-                    // Send msg SOLUTION_TAG to master
-
-                    // Send history
+                    // Send solution to master
+                    print_grid();
+                    send_work(gMOAS->mask->history, gMOAS->mask->history_len, 0, SOLUTION_TAG);
                 }
                 else {
                     // Send msg NO_WORK_TAG to master
-
+                    msg = 0;
+                    MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
                 }
 
                 clear_history();
             }
-            */
+            
 
         }
 
