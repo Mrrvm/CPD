@@ -8,6 +8,8 @@
 
 #define INIT_BUFF 6
 #define WORK_TRESH 4
+#define STEP_SIZE 10
+#define DEPTH_TRESH 6
 
 enum tags {INIT_TAG = 1, DIE_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG};
 enum slave_st {IDLE = 100, WORKING, REQUEST};
@@ -109,6 +111,19 @@ void rewrite_history(int index, int value, mask_t *mask) {
     mask->history[index].v = value;
 }
 
+int root_history(mask_t *mask, int root) {
+    int i;
+
+    /* gets first history whose value is not the last possible */
+    for (i = root; i < mask->history_len; i++) {
+
+        if (mask->history[mask->history_len].v != gMOAS->n)
+            return i;
+    }
+
+    return -1;
+}
+
 bool advance_cell(int i, int j) {
     int n = clear_cell(i, j, gMOAS->mask);
     while (++n <= gMOAS->n) {
@@ -121,27 +136,31 @@ bool advance_cell(int i, int j) {
     return false;
 }
 
-void solve(int pos, int total) {
-    while (1) {
-        while (pos < total && gMOAS->known[pos / gMOAS->n][pos % gMOAS->n]) {
-            ++pos;
+int solve_nsteps(int root, int *pos, int total, int nsteps) {
+    int i;
+
+    for (i = 0; i < nsteps; i++) {
+        while (*pos < total && gMOAS->known[*pos / gMOAS->n][*pos % gMOAS->n]) {
+            ++(*pos);
         }
-        if (pos >= total) {
+        if (*pos >= total) {
             gDONE = true;
-            break;
+            return 0;
         }
 
-        if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
-            ++pos;
+        if (advance_cell(*pos / gMOAS->n, *pos % gMOAS->n)) {
+            ++(*pos);
         } else {
-            if (gMOAS->mask->history_len == 0) {
-                break;
+            if (gMOAS->mask->history_len == root) {
+                return 0;
             }
-            pos = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
+            (*pos) = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
                   gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
             remove_last_from_history(gMOAS->mask);
         }
     }
+
+    return 1;
 }
 
 work_t *initial_work(int ntasks, int *top, int *size) {
@@ -154,7 +173,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         acc *= (gMOAS->box_size - depth++);
 
     *size = acc*2;
-    work = (int*) calloc (*size, sizeof(work_t));
+    work = (work_t*) calloc (*size, sizeof(work_t));
     *top = 0;
 
     /* Explore to depth */
@@ -218,8 +237,8 @@ void master() {
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     int idle_slaves = ntasks;
     int slaves_state[ntasks] = {IDLE};
-    int *work, top, wk_size, lost_work = 0;
-    int play;
+    work_t *work, play;
+    int top, wk_size, lost_work = 0;
 
     // Prepare initial work pool
     work = initial_work(ntasks, &top, &wk_size);
@@ -229,7 +248,7 @@ void master() {
         // get work from work pool
         play = work[--top];
 
-        // send work
+        // send work FIXME (play)
         MPI_Send(&play, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
         printf("Master sent work %d to Process %d\n", top, id);
 
@@ -243,7 +262,7 @@ void master() {
 
         slave = status.MPI_Status;
 
-        if(status.MPI_TAG == NO_WORK_TAG)
+        if (status.MPI_TAG == NO_WORK_TAG)
 
             if (top > 0)
                 /* There is available work */
@@ -349,6 +368,7 @@ void slave(int my_id) {
     MPI_Request request;
     int msg = 0, top, *play;
     int i, flag = -1, state = IDLE, size;
+    int root, pos, res;
 
     while (1) {
 
@@ -371,7 +391,16 @@ void slave(int my_id) {
             }
             else if (status.MPI_TAG == RED_TAG) {
                 // Redistribute work and send to master
+                // find top
+                root_history();
+
+                // build history from top
+
+                // change history
+                rewrite_history();
+
                 printf("Process %d redistributed work\n", my_id);
+
                 state = WORKING;
             }
             else if (status.MPI_TAG == INIT_TAG) {
@@ -391,17 +420,21 @@ void slave(int my_id) {
 
         if(state == WORKING) {
             // Do work
+            res = solve_nsteps(root, &pos, n->, STEP_SIZE);
 
-            // If found solution
-            if(solution) {
-                // Send msg SOLUTION_TAG to master
-            }
-
-            // When ending
-            if(ended) {
-                // Send msg NO_WORK_TAG to master
+            if (res == 0) {
                 state = IDLE;
+
+                if (gDONE) {
+                    // Send msg SOLUTION_TAG to master
+
+                }
+                else {
+                    // Send msg NO_WORK_TAG to master
+
+                }
             }
+
         }
     }
 }
