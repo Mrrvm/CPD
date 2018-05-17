@@ -267,19 +267,20 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     *top = 0;
     printf("Got %d taskers, %d possibilities, Starting on house %d\n", ntasks, acc, total);
 
-    // Explore to depth 
+    // Explore to depth
     while (1) {
         while (pos < total && gMOAS->known[pos / gMOAS->n][pos % gMOAS->n]) {
             ++pos;
         }
 
         if (pos >= total) {
+
               // save this history 
               //print_history(mask->history, mask->history_len);
               copy_history(&stack[*top]);
               (*top)++;
 
-              // backtrack 
+              // backtrack
               pos = mask->history[mask->history_len - 1].x * gMOAS->n +
                     mask->history[mask->history_len - 1].y;
 
@@ -454,7 +455,7 @@ void master(const char * filename) {
         // get work from work pool
         play = work[--top];
 
-        // send work 
+        // send work
         send_work(&play, slave);
         printf("Master sent work %d to Process %d\n", top, slave);
 
@@ -472,13 +473,13 @@ void master(const char * filename) {
         if (status.MPI_TAG == NO_WORK_TAG)
 
             if (top > 0)
-                // There is available work 
+                // There is available work
                 play = work[--top];
 
-                // Send work 
+                // Send work
                 send_work(&play, slave);
 
-                // If Redistribute 
+                // If Redistribute
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
@@ -495,20 +496,20 @@ void master(const char * filename) {
 
             }
             else {
-                // There is no work available 
+                // There is no work available
                 idle++;
                 slaves_state[slave] = IDLE;
 
                 if (idle == ntasks-1) {
-                    // No work here, no slaves working, its vacation time! 
+                    // No work here, no slaves working, its vacation time!
 
-                    // No solution found 
+                    // No solution found
 
                     exit_colony(ntasks);
                     return;
                 }
 
-                // Redistribute (if has not passed threshold) 
+                // Redistribute (if has not passed threshold)
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
@@ -533,26 +534,26 @@ void master(const char * filename) {
         else if(status.MPI_TAG == WORK_TAG) {
             play = msg;
 
-            // Handle work redistributed 
+            // Handle work redistributed
             if (idle > 0) {
-                // Find one idle slave 
+                // Find one idle slave
                 robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                 // if (robin == -1) ???
 
-                // Send work 
+                // Send work
                 send_work(&play, robin);
 
                 slaves_state[robin] = WORKING;
                 idle--;
             }
             else {
-                // Add to work queue 
+                // Add to work queue
 
                 work[top++] = play;
             }
 
-            // Slave that shared work state. 
+            // Slave that shared work state.
             if (lost_work > 0) {
                 lost_work--;
 
@@ -599,7 +600,7 @@ void slave(int my_id) {
                 work = receive_work(0, msg);
                 // Sets state to the beggining of history
                 restore_from_history(work->history, work->history_len);
-                init_root = work->history_len;
+                init_root = work->history_len - 1;
                 init_pos = gMOAS->mask->history[init_root].x * gMOAS->n + gMOAS->mask->history[init_root].y + 1;
 
                 state = WORKING;
@@ -610,7 +611,15 @@ void slave(int my_id) {
                 // find current root
                 root = root_history(init_root);
 
-                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
+                if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+
+                    state = WORKING;
+                }
+                else if(root != -1) {
+
+                    state = REQUEST;
+                }
+                else {
                     // make copy of history until root_history
 
                     // send work to master
@@ -619,9 +628,13 @@ void slave(int my_id) {
                     rewrite_history(root);
 
                     printf("Process %d redistributed work\n", my_id);
+                    state = WORKING;
                 }
                 */
-                state = WORKING;
+                }
+
+                if (root != -1 && ((gMOAS->n)*(gMOAS->n) - root) > DEPTH_TRESH) {
+
             }
             else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
@@ -634,7 +647,7 @@ void slave(int my_id) {
             flag = -1;
         }
 
-        if(state == WORKING) {
+        if(state != IDLE) {
             /*
             // Do work
 
@@ -658,6 +671,34 @@ void slave(int my_id) {
             }
             */
 
+        }
+
+        if (state == REQUEST) {
+            /*
+                // Redistribute work and send to master
+                // find current root
+                root = root_history(init_root);
+
+                if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+
+                    state = WORKING;
+                }
+                else if(root != -1) {
+
+                    state = REQUEST;
+                }
+                else {
+                    // make copy of history until root_history
+
+                    // send work to master
+                    send_work(&play, 0);
+                    // change history
+                    rewrite_history(root);
+
+                    printf("Process %d redistributed work\n", my_id);
+                    state = WORKING;
+                }
+                */
         }
     }
 }
