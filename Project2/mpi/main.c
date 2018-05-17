@@ -96,6 +96,10 @@ void remove_last_from_history(mask_t *mask) {
     mask->history_len = (mask->history_len == 0) ? 0 : mask->history_len - 1;
 }
 
+void clear_history(mask_t *mask) {
+    mask->history_len = 0;
+}
+
 void restore_from_history(mask_t *mask, info_t *history, int history_len) {
     for (int i = 0; i < history_len; i++) {
         clear_cell(history[i].x, history[i].y, gMOAS->mask);
@@ -104,11 +108,22 @@ void restore_from_history(mask_t *mask, info_t *history, int history_len) {
     }
 }
 
-void rewrite_history(int index, int value, mask_t *mask) {
+void copy_history(mask_t *mask, info_t **history, int *history_len) {
+
+    *history = calloc(gMOAS->n_empty, sizeof(info_t));
+
+
+}
+
+void rewrite_history(int index, mask_t *mask) {
     if (index > mask->history_len) {
         printf("Invalid index to rewrite");
     }
-    mask->history[index].v = value;
+    if (mask->history[index] >= gMOAS->n) {
+        printf("No fork space in history rewrite");
+    }
+
+    (mask->history[index].v)++;
 }
 
 int root_history(mask_t *mask, int root) {
@@ -183,12 +198,13 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         }
         if (pos >= total) {
               /* save this history */
-              work[*top].history =
-              work[*top].history_len =
+              copy_history(gMOAS->mask, &(work[*top].history), &(work[*top].history_len));
               (*top)++;
 
               /* backtrack */
-
+              pos = gMOAS->mask->history[gMOAS->mask->history_len - 1].x * gMOAS->n +
+                    gMOAS->mask->history[gMOAS->mask->history_len - 1].y;
+              remove_last_from_history(gMOAS->mask);
         }
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
@@ -395,20 +411,21 @@ void slave(int my_id) {
 
                 state = WORKING;
             }
-            else if (status.MPI_TAG == RED_TAG) {
+            else if (status.MPI_TAG == RED_TAG && state == WORKING) {
                 // Redistribute work and send to master
                 // find current root
                 root = root_history(gMOAS->mask, init_root);
 
-                if (((gMOAS->n) ^ 2 - root) < DEPTH_TRESH)
-                    continue;
+                if (root != -1 && ((gMOAS->n) ^ 2 - root) > DEPTH_TRESH) {
+                  // make copy of history until root_history
 
-                // build history from top
+                  // send work to master
 
-                // change history
-                rewrite_history();
+                  // change history
+                  rewrite_history(root, gMOAS->mask);
 
-                printf("Process %d redistributed work\n", my_id);
+                  printf("Process %d redistributed work\n", my_id);
+                }
 
                 state = WORKING;
             }
@@ -429,7 +446,7 @@ void slave(int my_id) {
 
         if(state == WORKING) {
             // Do work
-            res = solve_nsteps(root, &pos, n->, STEP_SIZE);
+            res = solve_nsteps(init_root, &pos, n->, STEP_SIZE);
 
             if (res == 0) {
                 state = IDLE;
@@ -437,11 +454,14 @@ void slave(int my_id) {
                 if (gDONE) {
                     // Send msg SOLUTION_TAG to master
 
+                    // Send history
                 }
                 else {
                     // Send msg NO_WORK_TAG to master
 
                 }
+
+                clear_history(gMOAS->mask);
             }
 
         }
