@@ -405,15 +405,15 @@ void read_file(const char *filename, int ntasks) {
 }
 
 
-void send_work(work_t *play, int id) {
+void send_work(work_t *work, int id) {
 
-    int size = play->history_len, i;
+    int size = work->history_len, i;
     MPI_Send(&size, 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
 
     for(i = 0; i< size; i++) {
-        MPI_Send(&(play->history[i].x), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
-        MPI_Send(&(play->history[i].y), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
-        MPI_Send(&(play->history[i].v), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+        MPI_Send(&(work->history[i].x), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+        MPI_Send(&(work->history[i].y), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
+        MPI_Send(&(work->history[i].v), 1, MPI_INT, id, WORK_TAG, MPI_COMM_WORLD);
     }
 }
 
@@ -442,27 +442,27 @@ void master(const char * filename) {
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
     int idle_slaves = ntasks;
     int slaves_state[ntasks];
-    work_t *stack, work;
+    work_t *stack, *work;
     int top, wk_size, lost_work = 0;
 
     read_file(filename, ntasks);
     // Prepare initial work pool
     stack = initial_work(ntasks, &top, &wk_size);
     print_work_stack(ntasks, stack);
-/*
+
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
         // get work from work pool
-        play = work[--top];
+        work = &(stack[--top]);
 
         // send work
-        send_work(&play, slave);
+        send_work(work, slave);
         printf("Master sent work %d to Process %d\n", top, slave);
 
         slaves_state[slave] = 1;
         idle_slaves--;
     }
-*/
+
     /*
     while (1) {
 
