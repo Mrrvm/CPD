@@ -368,7 +368,8 @@ void slave(int my_id) {
     MPI_Request request;
     int msg = 0, top, *play;
     int i, flag = -1, state = IDLE, size;
-    int root, pos, res;
+    int init_root, root, pos, res;
+    work_t work;
 
     while (1) {
 
@@ -387,12 +388,20 @@ void slave(int my_id) {
                 // Alloc work with size
                 // Set msg to work data
                 printf("Process %d got work %d\n", my_id, msg);
+
+                // Sets state to the beggining of history
+                restore_from_history(work->history, work->history_len);
+                init_root = work->history_len;
+
                 state = WORKING;
             }
             else if (status.MPI_TAG == RED_TAG) {
                 // Redistribute work and send to master
-                // find top
-                root_history();
+                // find current root
+                root = root_history(gMOAS->mask, init_root);
+
+                if (((gMOAS->n) ^ 2 - root) < DEPTH_TRESH)
+                    continue;
 
                 // build history from top
 
