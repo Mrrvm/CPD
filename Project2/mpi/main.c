@@ -7,12 +7,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define REDIST_ON
+#define REDIST_OFF
 
-#define INIT_BUFF 20
+#define INIT_BUFF 3
 #define WORK_TRESH 1
-#define STEP_SIZE 10
-#define DEPTH_TRESH 6
 
 enum tags { DIE_TAG = 1, RED_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG };
 enum slave_st { IDLE = 100, WORKING, REQUEST };
@@ -50,6 +48,7 @@ typedef struct work_type {
 
 moas_t *gMOAS;
 int gDONE;
+int init_buff;
 
 int square(int i, int j) {
     return (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
@@ -258,7 +257,7 @@ void print_history(info_t *history, int length) {
 
 void print_work_stack(int ntasks, work_t *stack) {
     int i;
-    for (i = 0; i < ntasks + INIT_BUFF; i++) {
+    for (i = 0; i < ntasks*INIT_BUFF; i++) {
         printf("Element %d\n", i);
         print_history(stack[i].history, stack[i].history_len);
         printf("\n\n");
@@ -282,7 +281,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     total++;
 
     /* Calculate number of starter possibilities according to ntasks */
-    while (acc < (ntasks + INIT_BUFF) && total < gMOAS->n) {
+    while (acc < (ntasks*INIT_BUFF) && total < gMOAS->n) {
         if (!gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
             acc *= (gMOAS->n - total);
         }
@@ -458,32 +457,36 @@ void read_file(const char *filename, int ntasks) {
 
 void send_work(info_t *history, int size, int id, int tag) {
 
-    int i;
+    int i, *block, index = 0;
     assert(size > 0);
     MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
+    block = (int*) calloc(3 * size, sizeof(int));
 
     for (i = 0; i < size; i++) {
-        MPI_Send(&(history[i].x), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
-        MPI_Send(&(history[i].y), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
-        MPI_Send(&(history[i].v), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
+        block[index++] = history[i].x;
+        block[index++] = history[i].y;
+        block[index++] = history[i].v;
     }
+
+    MPI_Send(block, 3*size, MPI_INT, id, tag, MPI_COMM_WORLD);
 }
 
 work_t *receive_work(int id, int size, int tag) {
     work_t *work;
-    int i, n;
+    int i, index = 0, *block;
     MPI_Status status;
+
+    block = (int*) calloc(3 * size, sizeof(int));
+    MPI_Recv(block, size*3, MPI_INT, id, tag, MPI_COMM_WORLD, &status);    
 
     work = (work_t *)malloc(sizeof(work_t));
     work->history = (info_t *)calloc(size, sizeof(info_t));
     work->history_len = size;
+
     for (i = 0; i < size; i++) {
-        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
-        work->history[i].x = n;
-        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
-        work->history[i].y = n;
-        MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
-        work->history[i].v = n;
+        work->history[i].x = block[index++];
+        work->history[i].y = block[index++];
+        work->history[i].v = block[index++];
         //printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x, work->history[i].y, work->history[i].v);
     }
     return work;
@@ -503,7 +506,7 @@ void master(const char *filename) {
     // Prepare initial work pool
     stack = initial_work(ntasks, &top, &wk_size);
     assert(stack != NULL);
-    print_work_stack(ntasks, stack);
+    //print_work_stack(ntasks, stack);
 
     for (slave = 1; slave < ntasks; ++slave) {
         slaves_state[slave] = IDLE;
@@ -533,7 +536,7 @@ void master(const char *filename) {
                  &status);
         
         slave = status.MPI_SOURCE;
-        print_slaves_state(slaves_state, ntasks);
+        //print_slaves_state(slaves_state, ntasks);
 
 
         if (status.MPI_TAG == NO_WORK_TAG) {
@@ -725,7 +728,6 @@ void slave(int my_id) {
 
                 state = WORKING;
             } else if (status.MPI_TAG == RED_TAG && state == WORKING) {
-                printf("Process %d has pos = %d\n", my_id, pos);
                 redistribute(init_root, &state, my_id);
             } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
@@ -742,7 +744,7 @@ void slave(int my_id) {
         if (state != IDLE) {
 
             // Do work
-            res = solve_nsteps(init_pos, &pos, &n, gMOAS->n * gMOAS->n, STEP_SIZE);
+            res = solve_nsteps(init_pos, &pos, &n, gMOAS->n * gMOAS->n, gMOAS->n);
 
             if (res == 0) {
                 state = IDLE;
