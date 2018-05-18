@@ -182,7 +182,7 @@ void free_gMOAS() {
     int i;
     for (i = 0; i < gMOAS->n; i++) {
         free(gMOAS->known[i]);
-        free((gMOAS->mask)->grid[i]);
+        free(gMOAS->mask->grid[i]);
     }
     free(gMOAS->known);
     free(gMOAS->mask->grid);
@@ -191,6 +191,7 @@ void free_gMOAS() {
     free(gMOAS->mask->squares);
     free(gMOAS->mask->bits);
     free(gMOAS->mask->history);
+    free(gMOAS->mask);
     free(gMOAS);
 }
 
@@ -239,7 +240,6 @@ void print_work_stack(int ntasks, work_t *stack) {
 }
 
 work_t *initial_work(int ntasks, int *top, int *size) {
-
     int total = 1, acc = gMOAS->n;
     work_t *stack;
     int pos = 0;
@@ -436,7 +436,6 @@ work_t *receive_work(int id, int size, int tag) {
 }
 
 void master(const char *filename) {
-
     MPI_Status status;
     int ntasks, msg, slave;
     int robin = 1;
@@ -471,7 +470,6 @@ void master(const char *filename) {
     }
 
     while (1) {
-
         MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
                  &status);
 
@@ -509,15 +507,10 @@ void master(const char *filename) {
 
                 if (idle_slaves == ntasks - 1) {
                     // No work here, no slaves working, its vacation time!
-                    // Free strucutures
-
                     // No solution found
                     printf("No solution\n");
-
-                    exit_colony(ntasks);
-                    return;
+                    break;
                 }
-
 #ifdef REDIST_ON
                 // Redistribute (if has not passed threshold)
                 if (top < WORK_TRESH) {
@@ -538,13 +531,15 @@ void master(const char *filename) {
         } else if (status.MPI_TAG == SOLUTION_TAG) {
 
             work = receive_work(slave, msg, SOLUTION_TAG);
-            printf("ienfpifnpren\n");
             print_history(work->history, work->history_len);
             // Save to grid and print
+            if (work->history_len == gMOAS->n_empty) {
+                restore_from_history(work->history, work->history_len);
+                print_grid();
+            }
 
             // Sends DIE_TAG by broadcast
-            exit_colony(ntasks);
-            return;
+            break;
         } else if (status.MPI_TAG == WORK_TAG) {
 
             work = receive_work(slave, msg, WORK_TAG);
@@ -579,11 +574,14 @@ void master(const char *filename) {
             }
         }
     }
+
     exit_colony(ntasks);
+    free_gMOAS();
 }
 
+/* Slave is run by less fortunate nodes and does all of the heavy lifting using
+ * a bit mask method */
 void slave(int my_id) {
-
     MPI_Status status;
     MPI_Request request;
     int msg = 0, top, *play;
@@ -647,9 +645,11 @@ void slave(int my_id) {
                 */
             } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
+                free_gMOAS();
                 return;
             } else if (status.MPI_TAG == DIE_TAG) {
                 printf("Process %d DIED\n", my_id);
+                free_gMOAS();
                 return;
             }
             flag = -1;
