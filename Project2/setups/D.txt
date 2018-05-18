@@ -1,0 +1,4 @@
+cpd-3 slots=1
+cpd-4 slots=1
+cpd-6 slots=1
+cpd-7 slots=1
