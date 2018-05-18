@@ -691,7 +691,7 @@ void slave(int my_id) {
 
                     state = WORKING;
                 }
-                else if(root != -1) {
+                else if(root == -1) {
 
                     state = REQUEST;
                 }
@@ -753,13 +753,14 @@ void slave(int my_id) {
 
                 state = WORKING;
             }
-            else if(root != -1) {
+            else if(root == -1) {
 
                 state = REQUEST;
             }
             else {
                 // make copy of history until root_history
                 copy_history(work, root);
+                print_history(work->history, work->history_len);
 
                 // send work to master
                 send_work(work->history, work->history_len, 0, WORK_TAG);
