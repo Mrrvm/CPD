@@ -63,14 +63,13 @@ void set_cell(int i, int j, int n) {
     mask->squares[square(i, j)] |= mask->bits[n];
 }
 
-int clear_cell(int i, int j) {
+void clear_cell(int i, int j) {
     mask_t *mask = gMOAS->mask;
     int n = mask->grid[i][j];
     mask->grid[i][j] = 0;
     mask->rows[i] &= ~mask->bits[n];
     mask->cols[j] &= ~mask->bits[n];
     mask->squares[square(i, j)] &= ~mask->bits[n];
-    return n;
 }
 
 bool is_available(int i, int j, int n) {
@@ -95,9 +94,27 @@ void add_to_history(int i, int j, int value) {
     mask->history_len++;
 }
 
-void remove_last_from_history() {
+info_t get_history_head(info_t *history, int history_len) {
+    assert(history_len != 0);
+    return history[history_len - 1];
+}
+
+int get_history_head_pos(info_t *history, int history_len) {
+    assert(history_len != 0);
+    return history[history_len - 1].x * gMOAS->n + history[history_len - 1].y;
+}
+
+int remove_last_from_history() {
     mask_t *mask = gMOAS->mask;
+    int n;
+
+    info_t head = get_history_head(mask->history, mask->history_len);
+    clear_cell(head.x, head.y);
+    n = head.v;
+
     mask->history_len = (mask->history_len == 0) ? 0 : mask->history_len - 1;
+
+    return n;
 }
 
 void clear_history() {
@@ -148,9 +165,9 @@ int root_history(int root) {
     return -1;
 }
 
-bool advance_cell(int i, int j) {
+bool advance_cell(int i, int j, int n) {
     mask_t *mask = gMOAS->mask;
-    int n = clear_cell(i, j);
+
     while (++n <= gMOAS->n) {
         if (is_available(i, j, n)) {
             set_cell(i, j, n);
@@ -194,27 +211,29 @@ void free_gMOAS() {
     free(gMOAS);
 }
 
-int solve_nsteps(int root, int *pos, int total, int nsteps) {
+int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
     int i;
     mask_t *mask = gMOAS->mask;
     for (i = 0; i < nsteps; i++) {
         while (*pos < total && gMOAS->known[*pos / gMOAS->n][*pos % gMOAS->n]) {
             ++(*pos);
+            *n = 1;
         }
         if (*pos >= total) {
             gDONE = true;
             return 0;
         }
 
-        if (advance_cell(*pos / gMOAS->n, *pos % gMOAS->n)) {
+        if (advance_cell(*pos / gMOAS->n, *pos % gMOAS->n, *n)) {
             ++(*pos);
+            *n = 1;
         } else {
             if (mask->history_len == root) {
                 return 0;
             }
             (*pos) = mask->history[mask->history_len - 1].x * gMOAS->n +
                      mask->history[mask->history_len - 1].y;
-            remove_last_from_history();
+            *n = remove_last_from_history();
         }
     }
 
@@ -242,6 +261,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     int total = 1, acc = gMOAS->n;
     work_t *stack;
     int pos = 0;
+    int val = 1;
     mask_t *mask = gMOAS->mask;
 
     /* Calculate number of starter possibilities according to ntasks */
@@ -265,7 +285,6 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     *top = 0;
     printf("Got %d taskers, %d possibilities, Working until house %d\n", ntasks,
            acc, total);
-    printf("Known grid:%d\n", gMOAS->known[0 / gMOAS->n][0 % gMOAS->n]);
 
     // Explore to depth
     while (1) {
@@ -281,22 +300,22 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
             // backtrack
             if (mask->history_len != 0) {
-                pos = mask->history[mask->history_len - 1].x * gMOAS->n +
-                      mask->history[mask->history_len - 1].y;
 
-                remove_last_from_history();
+                pos = get_history_head_pos(gMOAS->mask->history,
+                                           gMOAS->mask->history_len);
+                val = remove_last_from_history();
             }
         }
 
-        if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
+        if (advance_cell(pos / gMOAS->n, pos % gMOAS->n, val)) {
             ++pos;
         } else {
             if (mask->history_len == 0) {
                 break;
             }
-            pos = mask->history[mask->history_len - 1].x * gMOAS->n +
-                  mask->history[mask->history_len - 1].y;
-            remove_last_from_history();
+            pos =
+                get_history_head_pos(gMOAS->mask->history, gMOAS->mask->history_len);
+            val = remove_last_from_history();
         }
     }
 
@@ -396,7 +415,7 @@ void read_file(const char *filename, int ntasks) {
     }
 
     MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(struct info));
+    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
     gMOAS->mask->history_len = 0;
     fclose(sudoku_file);
 }
@@ -587,7 +606,7 @@ void slave(int my_id) {
     MPI_Request request;
     int msg = 0, top, *play;
     int i, flag = -1, state = IDLE, size;
-    int init_root, root, init_pos, pos, res, history_len;
+    int init_root, root, init_pos, pos, n, res, history_len;
     work_t *work;
 
     // Receive map
@@ -614,6 +633,7 @@ void slave(int my_id) {
                 init_pos = work->history[init_root].x * gMOAS->n +
                            work->history[init_root].y + 1;
                 pos = init_pos;
+                n = 1;
                 restore_from_history(work->history, work->history_len);
                 print_grid();
 
@@ -659,7 +679,7 @@ void slave(int my_id) {
         if (state != IDLE) {
 
             // Do work
-            res = solve_nsteps(init_pos, &pos, gMOAS->n * gMOAS->n, STEP_SIZE);
+            res = solve_nsteps(init_pos, &pos, &n, gMOAS->n * gMOAS->n, STEP_SIZE);
 
             if (res == 0) {
                 state = IDLE;
