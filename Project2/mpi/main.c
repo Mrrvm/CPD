@@ -9,7 +9,7 @@
 
 #define REDIST_ON
 
-#define INIT_BUFF 6
+#define INIT_BUFF 16
 #define WORK_TRESH 4
 #define STEP_SIZE 10
 #define DEPTH_TRESH 6
@@ -138,7 +138,9 @@ void copy_history(work_t *work, int history_len) {
     int i = 0, len = history_len;
     work->history = calloc(len, sizeof(info_t));
     for (i = 0; i < len; i++) {
-        work->history[i] = gMOAS->mask->history[i];
+        work->history[i].v = gMOAS->mask->history[i].v;
+        work->history[i].x = gMOAS->mask->history[i].x;
+        work->history[i].y = gMOAS->mask->history[i].y;
     }
     work->history_len = len;
 }
@@ -236,7 +238,7 @@ int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
             }
             info_t head = get_history_head(mask->history, mask->history_len);
             if (head.v != mask->grid[head.x][head.y]) {
-                restore_from_history(mask->history, mask->history_len);
+                //restore_from_history(mask->history, mask->history_len);
             }
             (*pos) = get_history_head_pos(mask->history, mask->history_len);
             *n = remove_last_from_history();
@@ -457,7 +459,7 @@ void read_file(const char *filename, int ntasks) {
 void send_work(info_t *history, int size, int id, int tag) {
 
     int i;
-    printf("Sending size %d\n", size);
+    printf("%d is sending size %d\n", id, size);
     assert(size > 0);
     MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
 
@@ -483,8 +485,7 @@ work_t *receive_work(int id, int size, int tag) {
         work->history[i].y = n;
         MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].v = n;
-        printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x,
-               work->history[i].y, work->history[i].v);
+        //printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x, work->history[i].y, work->history[i].v);
     }
     return work;
 }
@@ -494,7 +495,7 @@ void master(const char *filename) {
     int ntasks, msg, slave;
     int robin = 1;
     MPI_Comm_size(MPI_COMM_WORLD, &ntasks);
-    int idle_slaves = ntasks;
+    int idle_slaves = 0;
     int slaves_state[ntasks];
     work_t *stack, *work;
     int top, wk_size, lost_work = 0;
@@ -505,8 +506,10 @@ void master(const char *filename) {
     assert(stack != NULL);
     print_work_stack(ntasks, stack);
 
-    for (slave = 1; slave < ntasks; ++slave)
+    for (slave = 1; slave < ntasks; ++slave) {
         slaves_state[slave] = IDLE;
+        idle_slaves++;
+    }
 
     // Distribute initial work
     for (slave = 1; slave < ntasks; ++slave) {
@@ -534,7 +537,7 @@ void master(const char *filename) {
         slave = status.MPI_SOURCE;
 
         if (status.MPI_TAG == NO_WORK_TAG) {
-
+            printf("Master received NO_WORK_TAG from process %d\n", slave);
             if (top > 0) {
                 // There is available work
                 work = &stack[--top];
@@ -595,11 +598,11 @@ void master(const char *filename) {
         } else if (status.MPI_TAG == SOLUTION_TAG) {
 
             work = receive_work(slave, msg, SOLUTION_TAG);
-            print_history(work->history, work->history_len);
+            
             // Save to grid and print
             if (work->history_len == gMOAS->n_empty) {
                 restore_from_history(work->history, work->history_len);
-                print_grid();
+                
             }
 
             // Sends DIE_TAG by broadcast
@@ -611,9 +614,9 @@ void master(const char *filename) {
             // Handle work redistributed
             if (idle_slaves > 0) {
                 // Find one idle slave
-                robin = round_robin(slaves_state, ntasks, WORKING, slave);
+                robin = round_robin(slaves_state, ntasks, IDLE, slave);
 
-                // if (robin == -1) ???
+                assert(robin != -1); 
 
                 // Send work
                 send_work(work->history, work->history_len, robin, WORK_TAG);
@@ -645,9 +648,9 @@ void master(const char *filename) {
 
 void redistribute(int init_root, int *state, int my_id) {
     int root;
-    work_t *work;
+    work_t work;
 
-
+   
     // Redistribute work and send to master
     // find current root
     root = root_history(init_root);
@@ -664,20 +667,23 @@ void redistribute(int init_root, int *state, int my_id) {
     }
     else {
         // make copy of history until root_history
-        copy_history(work, root);
-        print_history(work->history, work->history_len);
+        //print_history(work->history, work->history_len);
+        copy_history(&work, root+1);
 
         // send work to master
-        send_work(work->history, work->history_len, 0, WORK_TAG);
+        send_work(work.history, work.history_len, 0, WORK_TAG);
 
         // change history
         rewrite_history(root);
 
         printf("Process %d redistributed work\n", my_id);
         *state = WORKING;
+
+        free(work.history);
     }
 
-    free(work);
+    printf("REDISTRIBUTE HANDLED\n");
+
 }
 
 /* Slave is run by less fortunate nodes and does all of the heavy lifting using
@@ -716,11 +722,10 @@ void slave(int my_id) {
                 pos = init_pos;
                 n = 0;
                 restore_from_history(work->history, work->history_len);
-                print_grid();
 
                 state = WORKING;
             } else if (status.MPI_TAG == RED_TAG && state == WORKING) {
-                redistribute(&root, init_root, &state, my_id);
+                redistribute(init_root, &state, my_id);
             } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
                 free_gMOAS();
@@ -741,6 +746,7 @@ void slave(int my_id) {
             if (res == 0) {
                 state = IDLE;
 
+
                 if (gDONE) {
                     // Send solution to master
                     print_grid();
@@ -748,9 +754,11 @@ void slave(int my_id) {
                               SOLUTION_TAG);
                 } else {
                     // Send msg NO_WORK_TAG to master
+                    printf("Process %d got no work\n", my_id);
                     msg = 0;
                     MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
                 }
+
 
                 clear_history();
             }
@@ -758,7 +766,7 @@ void slave(int my_id) {
 
         if (state == REQUEST) {
 
-            redistribute(&root, init_root, &state, my_id);
+            redistribute(init_root, &state, my_id);
         }
     }
 }
