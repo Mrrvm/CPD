@@ -299,8 +299,9 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     *size = acc * 2;
     stack = (work_t *)calloc(*size, sizeof(work_t));
     *top = 0;
-    printf("Got %d taskers, %d possibilities, Working until house %d\n", ntasks,
-           acc, total);
+    /* printf("Got %d taskers, %d possibilities, Working until house %d\n",
+     * ntasks, */
+    /*        acc, total); */
 
     // Explore to depth
     while (1) {
