@@ -9,8 +9,8 @@
 
 #define REDIST_ON
 
-#define INIT_BUFF 16
-#define WORK_TRESH 4
+#define INIT_BUFF 20
+#define WORK_TRESH 1
 #define STEP_SIZE 10
 #define DEPTH_TRESH 6
 
@@ -459,7 +459,6 @@ void read_file(const char *filename, int ntasks) {
 void send_work(info_t *history, int size, int id, int tag) {
 
     int i;
-    printf("%d is sending size %d\n", id, size);
     assert(size > 0);
     MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
 
@@ -521,23 +520,24 @@ void master(const char *filename) {
 
         // send work
         send_work(work->history, work->history_len, slave, WORK_TAG);
-        printf("Master sent work %d to Process %d\n", top, slave);
+        
 
         slaves_state[slave] = WORKING;
         idle_slaves--;
     }
 
     while (1) {
-        print_slaves_state(slaves_state, ntasks);
-
+        
 
         MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
                  &status);
-
+        
         slave = status.MPI_SOURCE;
+        print_slaves_state(slaves_state, ntasks);
+
 
         if (status.MPI_TAG == NO_WORK_TAG) {
-            printf("Master received NO_WORK_TAG from process %d\n", slave);
+
             if (top > 0) {
                 // There is available work
                 work = &stack[--top];
@@ -551,12 +551,12 @@ void master(const char *filename) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                     if (robin != -1) {
-                        printf("Master will request work to %d\n", robin);
+  
 
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
                     } else {
-                        printf("Master failed to request work\n");
+ 
 
                         lost_work++;
 
@@ -582,12 +582,12 @@ void master(const char *filename) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                     if (robin != -1) {
-                        printf("Will request work to %d\n", robin);
+ 
 
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
                     } else {
-                        printf("Failed to request work\n");
+                        
                         lost_work++;
 
                         robin = 1;
@@ -655,9 +655,9 @@ void redistribute(int init_root, int *state, int my_id) {
     // find current root
     root = root_history(init_root);
 
-    printf("Current root of process %d is %d (base is %d)\n", my_id, root, init_root);
+    //printf("Current root of process %d is %d (base is %d)\n", my_id, root, init_root);
 
-    if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+    if (((gMOAS->n)*(gMOAS->n) - root) < gMOAS->box_size*5) {
 
         *state = WORKING;
     }
@@ -668,21 +668,21 @@ void redistribute(int init_root, int *state, int my_id) {
     else {
         // make copy of history until root_history
         //print_history(work->history, work->history_len);
+        // change history
+        rewrite_history(root);
         copy_history(&work, root+1);
 
         // send work to master
         send_work(work.history, work.history_len, 0, WORK_TAG);
 
-        // change history
-        rewrite_history(root);
 
-        printf("Process %d redistributed work\n", my_id);
+        //printf("Process %d redistributed work\n", my_id);
         *state = WORKING;
 
         free(work.history);
     }
 
-    printf("REDISTRIBUTE HANDLED\n");
+   
 
 }
 
@@ -712,7 +712,7 @@ void slave(int my_id) {
         if (flag == 1) {
             if (status.MPI_TAG == WORK_TAG) {
 
-                printf("Process %d got work of size %d\n", my_id, msg);
+                //printf("Process %d got work of size %d\n", my_id, msg);
                 work = receive_work(0, msg, WORK_TAG);
 
                 // Sets state to the beggining of history
@@ -725,6 +725,7 @@ void slave(int my_id) {
 
                 state = WORKING;
             } else if (status.MPI_TAG == RED_TAG && state == WORKING) {
+                printf("Process %d has pos = %d\n", my_id, pos);
                 redistribute(init_root, &state, my_id);
             } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
@@ -754,7 +755,6 @@ void slave(int my_id) {
                               SOLUTION_TAG);
                 } else {
                     // Send msg NO_WORK_TAG to master
-                    printf("Process %d got no work\n", my_id);
                     msg = 0;
                     MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
                 }
@@ -766,6 +766,7 @@ void slave(int my_id) {
 
         if (state == REQUEST) {
 
+            
             redistribute(init_root, &state, my_id);
         }
     }
