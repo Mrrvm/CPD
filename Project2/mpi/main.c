@@ -263,7 +263,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     *size = acc * 2;
     stack = (work_t *)calloc(*size, sizeof(work_t));
     *top = 0;
-    printf("Got %d taskers, %d possibilities, Starting on house %d\n", ntasks,
+    printf("Got %d taskers, %d possibilities, Working until house %d\n", ntasks,
            acc, total);
     printf("Known grid:%d\n", gMOAS->known[0 / gMOAS->n][0 % gMOAS->n]);
 
