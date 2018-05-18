@@ -231,6 +231,10 @@ int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
             if (mask->history_len == root) {
                 return 0;
             }
+            info_t head = get_history_head(mask->history, mask->history_len);
+            if (head.v != mask->grid[head.x][head.y]) {
+                restore_from_history(mask->history, mask->history_len);
+            }
             (*pos) = get_history_head_pos(mask->history, mask->history_len);
             *n = remove_last_from_history();
         }
