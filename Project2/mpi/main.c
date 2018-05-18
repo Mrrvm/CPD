@@ -304,6 +304,8 @@ work_t *initial_work(int ntasks, int *top, int *size) {
                 pos = get_history_head_pos(gMOAS->mask->history,
                                            gMOAS->mask->history_len);
                 val = remove_last_from_history();
+            } else {
+                val = 1;
             }
         }
 
