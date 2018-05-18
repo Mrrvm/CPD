@@ -231,8 +231,7 @@ int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
             if (mask->history_len == root) {
                 return 0;
             }
-            (*pos) = mask->history[mask->history_len - 1].x * gMOAS->n +
-                     mask->history[mask->history_len - 1].y;
+            (*pos) = get_history_head_pos(mask->history, mask->history_len);
             *n = remove_last_from_history();
         }
     }
