@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-//#define REDIST_ON
+#define REDIST_ON
 
 #define INIT_BUFF 6
 #define WORK_TRESH 4
@@ -134,8 +134,8 @@ void restore_from_history(info_t *history, int history_len) {
     }
 }
 
-void copy_history(work_t *work) {
-    int i = 0, len = gMOAS->mask->history_len;
+void copy_history(work_t *work, int history_len) {
+    int i = 0, len = history_len;
     work->history = calloc(len, sizeof(info_t));
     for (i = 0; i < len; i++) {
         work->history[i] = gMOAS->mask->history[i];
@@ -311,7 +311,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         if (pos >= total) {
             // save this history
             // print_history(mask->history, mask->history_len);
-            copy_history(&stack[*top]);
+            copy_history(&stack[*top], gMOAS->mask->history_len);
             (*top)++;
 
             // backtrack
@@ -357,6 +357,18 @@ int round_robin(int *slaves_state, int ntasks, int state, int begin) {
     }
 
     return -1;
+}
+
+void print_slaves_state(int *slave_state, int ntasks) {
+    int id;
+
+    printf("Slave state: ");
+
+    for (id = 1; id < ntasks; ++id) {
+        printf("(slave %d - %s)", id, (slave_state[id] == IDLE)?"IDLE":((slave_state[id] == WORKING)?"WORKING":"REQUEST"));         
+    }
+
+    printf("\n");
 }
 
 void build_map() {
@@ -507,11 +519,14 @@ void master(const char *filename) {
         send_work(work->history, work->history_len, slave, WORK_TAG);
         printf("Master sent work %d to Process %d\n", top, slave);
 
-        slaves_state[slave] = 1;
+        slaves_state[slave] = WORKING;
         idle_slaves--;
     }
 
     while (1) {
+        print_slaves_state(slaves_state, ntasks);
+
+
         MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
                  &status);
 
@@ -532,9 +547,13 @@ void master(const char *filename) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                     if (robin != -1) {
+                        printf("Master will request work to %d\n", robin);
+
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
                     } else {
+                        printf("Master failed to request work\n");  
+
                         lost_work++;
 
                         robin = 1;
@@ -559,10 +578,12 @@ void master(const char *filename) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                     if (robin != -1) {
+                        printf("Will request work to %d\n", robin);
 
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
                     } else {
+                        printf("Failed to request work\n");
                         lost_work++;
 
                         robin = 1;
@@ -661,7 +682,6 @@ void slave(int my_id) {
 
                 state = WORKING;
             } else if (status.MPI_TAG == RED_TAG && state == WORKING) {
-                /*
                 // Redistribute work and send to master
                 // find current root
                 root = root_history(init_root);
@@ -676,16 +696,18 @@ void slave(int my_id) {
                 }
                 else {
                     // make copy of history until root_history
+                    copy_history(work, root);
+                    print_history(work->history, work->history_len);
 
                     // send work to master
-                    send_work(&play, 0);
+                    send_work(work->history, work->history_len, 0, WORK_TAG);
+
                     // change history
                     rewrite_history(root);
 
                     printf("Process %d redistributed work\n", my_id);
                     state = WORKING;
                 }
-                */
             } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
                 free_gMOAS();
@@ -722,31 +744,31 @@ void slave(int my_id) {
         }
 
         if (state == REQUEST) {
-            /*
-                // Redistribute work and send to master
-                // find current root
-                root = root_history(init_root);
+            // Redistribute work and send to master
+            // find current root
+            root = root_history(init_root);
 
-                if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
+            if (((gMOAS->n)*(gMOAS->n) - root) < DEPTH_TRESH) {
 
-                    state = WORKING;
-                }
-                else if(root != -1) {
+                state = WORKING;
+            }
+            else if(root != -1) {
 
-                    state = REQUEST;
-                }
-                else {
-                    // make copy of history until root_history
+                state = REQUEST;
+            }
+            else {
+                // make copy of history until root_history
+                copy_history(work, root);
 
-                    // send work to master
-                    send_work(&play, 0);
-                    // change history
-                    rewrite_history(root);
+                // send work to master
+                send_work(work->history, work->history_len, 0, WORK_TAG);
 
-                    printf("Process %d redistributed work\n", my_id);
-                    state = WORKING;
-                }
-                */
+                // change history
+                rewrite_history(root);
+
+                printf("Process %d redistributed work\n", my_id);
+                state = WORKING;
+            }
         }
     }
 }
