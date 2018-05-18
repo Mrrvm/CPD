@@ -6,15 +6,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-//#define REDIST_ON 
+//#define REDIST_ON
 
 #define INIT_BUFF 6
 #define WORK_TRESH 4
 #define STEP_SIZE 10
 #define DEPTH_TRESH 6
 
-enum tags {DIE_TAG = 1, RED_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG};
-enum slave_st {IDLE = 100, WORKING, REQUEST};
+enum tags { DIE_TAG = 1, RED_TAG, WORK_TAG, NO_WORK_TAG, SOLUTION_TAG };
+enum slave_st { IDLE = 100, WORKING, REQUEST };
 
 typedef unsigned __int128 uint128_t;
 
@@ -49,7 +49,6 @@ typedef struct work_type {
 
 moas_t *gMOAS;
 int gDONE;
-
 
 int square(int i, int j) {
     return (i / gMOAS->box_size) * gMOAS->box_size + j / gMOAS->box_size;
@@ -119,7 +118,7 @@ void copy_history(work_t *work) {
     mask_t *mask = gMOAS->mask;
     int i = 0, len = mask->history_len;
     work->history = calloc(len, sizeof(info_t));
-    for(i=0; i < len; i++) {
+    for (i = 0; i < len; i++) {
         work->history[i] = mask->history[i];
     }
     work->history_len = len;
@@ -130,7 +129,7 @@ void rewrite_history(int index) {
     if (index > mask->history_len) {
         printf("Invalid index to rewrite");
     }
-    if (mask->history[index].x+mask->history[index].y >= gMOAS->n) {
+    if (mask->history[index].x + mask->history[index].y >= gMOAS->n) {
         printf("No fork space in history rewrite");
     }
 
@@ -214,7 +213,7 @@ int solve_nsteps(int root, int *pos, int total, int nsteps) {
                 return 0;
             }
             (*pos) = mask->history[mask->history_len - 1].x * gMOAS->n +
-                  mask->history[mask->history_len - 1].y;
+                     mask->history[mask->history_len - 1].y;
             remove_last_from_history();
         }
     }
@@ -222,19 +221,17 @@ int solve_nsteps(int root, int *pos, int total, int nsteps) {
     return 1;
 }
 
-
-
 void print_history(info_t *history, int length) {
     int i = 0;
     printf("History length %d\n", length);
-    for(i=0; i<length; i++) {
+    for (i = 0; i < length; i++) {
         printf("map[%d][%d] = %d\n", history[i].x, history[i].y, history[i].v);
     }
 }
 
 void print_work_stack(int ntasks, work_t *stack) {
     int i;
-    for(i=0; i<ntasks+INIT_BUFF; i++) {
+    for (i = 0; i < ntasks + INIT_BUFF; i++) {
         printf("Element %d\n", i);
         print_history(stack[i].history, stack[i].history_len);
         printf("\n\n");
@@ -250,24 +247,25 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
     /* Calculate number of starter possibilities according to ntasks */
     while (acc < (ntasks + INIT_BUFF) && total < gMOAS->n) {
-        if(!gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
+        if (!gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
             acc *= (gMOAS->n - total);
         }
         total++;
     }
 
-    while(1) {
-        if(gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
+    while (1) {
+        if (gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
             total++;
         } else {
             break;
         }
     }
 
-    *size = acc*2;
-    stack = (work_t*) calloc (*size, sizeof(work_t));
+    *size = acc * 2;
+    stack = (work_t *)calloc(*size, sizeof(work_t));
     *top = 0;
-    printf("Got %d taskers, %d possibilities, Starting on house %d\n", ntasks, acc, total);
+    printf("Got %d taskers, %d possibilities, Starting on house %d\n", ntasks,
+           acc, total);
 
     // Explore to depth
     while (1) {
@@ -277,21 +275,21 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
         if (pos >= total) {
 
-              // save this history 
-              //print_history(mask->history, mask->history_len);
-              copy_history(&stack[*top]);
-              (*top)++;
+            // save this history
+            // print_history(mask->history, mask->history_len);
+            copy_history(&stack[*top]);
+            (*top)++;
 
-              // backtrack
-              pos = mask->history[mask->history_len - 1].x * gMOAS->n +
-                    mask->history[mask->history_len - 1].y;
+            // backtrack
+            pos = mask->history[mask->history_len - 1].x * gMOAS->n +
+                  mask->history[mask->history_len - 1].y;
 
-              remove_last_from_history();
+            remove_last_from_history();
         }
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
             ++pos;
-            
+
         } else {
             if (mask->history_len == 0) {
                 break;
@@ -305,20 +303,19 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     return stack;
 }
 
-
 int round_robin(int *slaves_state, int ntasks, int state, int begin) {
-  int id, robin = begin;
+    int id, robin = begin;
 
-  for (id = 1; id < ntasks; ++id) {
-      robin = (robin == ntasks-1) ? (1) : (robin+1);
+    for (id = 1; id < ntasks; ++id) {
+        robin = (robin == ntasks - 1) ? (1) : (robin + 1);
 
-      if (slaves_state[robin] == state) {
+        if (slaves_state[robin] == state) {
 
-          return robin;
-      }
-  }
+            return robin;
+        }
+    }
 
-  return -1;
+    return -1;
 }
 
 void build_map() {
@@ -353,7 +350,6 @@ void build_map() {
     gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
     gMOAS->mask->history_len = 0;
 }
-
 
 void read_file(const char *filename, int ntasks) {
     FILE *sudoku_file;
@@ -399,13 +395,11 @@ void read_file(const char *filename, int ntasks) {
         }
     }
 
-
     MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
     gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
     gMOAS->mask->history_len = 0;
     fclose(sudoku_file);
 }
-
 
 void send_work(info_t *history, int size, int id, int tag) {
 
@@ -413,7 +407,7 @@ void send_work(info_t *history, int size, int id, int tag) {
     printf("Sending size %d\n", size);
     MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
 
-    for(i = 0; i< size; i++) {
+    for (i = 0; i < size; i++) {
         MPI_Send(&(history[i].x), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
         MPI_Send(&(history[i].y), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
         MPI_Send(&(history[i].v), 1, MPI_INT, id, tag, MPI_COMM_WORLD);
@@ -425,23 +419,23 @@ work_t *receive_work(int id, int size, int tag) {
     int i, n;
     MPI_Status status;
 
-    work = (work_t*) malloc (sizeof(work_t));
+    work = (work_t *)malloc(sizeof(work_t));
     work->history = (info_t *)calloc(size, sizeof(info_t));
     work->history_len = size;
-    for(i=0; i<size; i++) {
+    for (i = 0; i < size; i++) {
         MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].x = n;
         MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].y = n;
         MPI_Recv(&n, 1, MPI_INT, id, tag, MPI_COMM_WORLD, &status);
         work->history[i].v = n;
-        printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x, work->history[i].y, work->history[i].v);
+        printf("history[%d] = (%d, %d, %d)\n", i, work->history[i].x,
+               work->history[i].y, work->history[i].v);
     }
     return work;
 }
 
-
-void master(const char * filename) {
+void master(const char *filename) {
 
     MPI_Status status;
     int ntasks, msg, slave;
@@ -457,7 +451,7 @@ void master(const char * filename) {
     stack = initial_work(ntasks, &top, &wk_size);
     print_work_stack(ntasks, stack);
 
-    for (slave = 1; slave < ntasks; ++slave) 
+    for (slave = 1; slave < ntasks; ++slave)
         slaves_state[slave] = IDLE;
 
     // Distribute initial work
@@ -476,10 +470,10 @@ void master(const char * filename) {
         idle_slaves--;
     }
 
-    
     while (1) {
 
-        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,
+                 &status);
 
         slave = status.MPI_SOURCE;
 
@@ -492,30 +486,28 @@ void master(const char * filename) {
                 // Send work
                 send_work(work->history, work->history_len, slave, WORK_TAG);
 
-                // If Redistribute
-                #ifdef REDIST_ON
+// If Redistribute
+#ifdef REDIST_ON
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
 
                     if (robin != -1) {
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
-                    }
-                    else {
+                    } else {
                         lost_work++;
 
                         robin = 1;
                     }
                 }
-                #endif
+#endif
 
-            }
-            else {
+            } else {
                 // There is no work available
                 idle_slaves++;
                 slaves_state[slave] = IDLE;
 
-                if (idle_slaves == ntasks-1) {
+                if (idle_slaves == ntasks - 1) {
                     // No work here, no slaves working, its vacation time!
                     // Free strucutures
 
@@ -526,7 +518,7 @@ void master(const char * filename) {
                     return;
                 }
 
-                #ifdef REDIST_ON
+#ifdef REDIST_ON
                 // Redistribute (if has not passed threshold)
                 if (top < WORK_TRESH) {
                     robin = round_robin(slaves_state, ntasks, WORKING, slave);
@@ -535,17 +527,15 @@ void master(const char * filename) {
 
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
-                    }
-                    else {
+                    } else {
                         lost_work++;
 
                         robin = 1;
                     }
                 }
-                #endif
+#endif
             }
-        }
-        else if(status.MPI_TAG == SOLUTION_TAG) {
+        } else if (status.MPI_TAG == SOLUTION_TAG) {
 
             work = receive_work(slave, msg, SOLUTION_TAG);
             printf("ienfpifnpren\n");
@@ -555,9 +545,8 @@ void master(const char * filename) {
             // Sends DIE_TAG by broadcast
             exit_colony(ntasks);
             return;
-        }
-        else if(status.MPI_TAG == WORK_TAG) {
-            
+        } else if (status.MPI_TAG == WORK_TAG) {
+
             work = receive_work(slave, msg, WORK_TAG);
 
             // Handle work redistributed
@@ -572,8 +561,7 @@ void master(const char * filename) {
 
                 slaves_state[robin] = WORKING;
                 idle_slaves--;
-            }
-            else {
+            } else {
                 // Add to work queue
 
                 stack[top++] = *work;
@@ -585,18 +573,14 @@ void master(const char * filename) {
 
                 MPI_Send(&msg, 1, MPI_INT, slave, RED_TAG, MPI_COMM_WORLD);
                 slaves_state[slave] = REQUEST;
-            } 
-            else {
+            } else {
 
                 slaves_state[slave] = WORKING;
             }
         }
-
     }
     exit_colony(ntasks);
-
 }
-
 
 void slave(int my_id) {
 
@@ -609,34 +593,33 @@ void slave(int my_id) {
 
     // Receive map
     build_map();
-    //print_grid();
+    // print_grid();
 
     while (1) {
 
-        if(flag != 0) {
+        if (flag != 0) {
             MPI_Irecv(&msg, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &request);
-            flag = 0 ;
+            flag = 0;
         }
 
         MPI_Test(&request, &flag, &status);
 
-        if(flag == 1) {
+        if (flag == 1) {
             if (status.MPI_TAG == WORK_TAG) {
 
                 printf("Process %d got work of size %d\n", my_id, msg);
                 work = receive_work(0, msg, WORK_TAG);
-                
-                
+
                 // Sets state to the beggining of history
                 init_root = work->history_len - 1;
-                init_pos = work->history[init_root].x * gMOAS->n + work->history[init_root].y + 1;
+                init_pos = work->history[init_root].x * gMOAS->n +
+                           work->history[init_root].y + 1;
                 pos = init_pos;
                 restore_from_history(work->history, work->history_len);
                 print_grid();
 
                 state = WORKING;
-            }
-            else if (status.MPI_TAG == RED_TAG && state == WORKING) {
+            } else if (status.MPI_TAG == RED_TAG && state == WORKING) {
                 /*
                 // Redistribute work and send to master
                 // find current root
@@ -662,20 +645,18 @@ void slave(int my_id) {
                     state = WORKING;
                 }
                 */
-            }
-            else if (status.MPI_TAG == SOLUTION_TAG) {
+            } else if (status.MPI_TAG == SOLUTION_TAG) {
                 printf("Process %d found solution\n", my_id);
                 return;
-            }
-            else if (status.MPI_TAG == DIE_TAG) {
+            } else if (status.MPI_TAG == DIE_TAG) {
                 printf("Process %d DIED\n", my_id);
                 return;
             }
             flag = -1;
         }
 
-        if(state != IDLE) {
-            
+        if (state != IDLE) {
+
             // Do work
             res = solve_nsteps(init_pos, &pos, gMOAS->n * gMOAS->n, STEP_SIZE);
 
@@ -685,9 +666,9 @@ void slave(int my_id) {
                 if (gDONE) {
                     // Send solution to master
                     print_grid();
-                    send_work(gMOAS->mask->history, gMOAS->mask->history_len, 0, SOLUTION_TAG);
-                }
-                else {
+                    send_work(gMOAS->mask->history, gMOAS->mask->history_len, 0,
+                              SOLUTION_TAG);
+                } else {
                     // Send msg NO_WORK_TAG to master
                     msg = 0;
                     MPI_Send(&msg, 1, MPI_INT, 0, NO_WORK_TAG, MPI_COMM_WORLD);
@@ -695,8 +676,6 @@ void slave(int my_id) {
 
                 clear_history();
             }
-            
-
         }
 
         if (state == REQUEST) {
@@ -732,7 +711,7 @@ void slave(int my_id) {
 int main(int argc, char *argv[]) {
 
     int my_id;
-    if(argc < 2) {
+    if (argc < 2) {
         printf("Usage: ./program [filename]\n");
         exit(-1);
     }
