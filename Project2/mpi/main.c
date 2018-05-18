@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <inttypes.h>
 #include <mpi.h>
 #include <stdbool.h>
@@ -105,7 +106,6 @@ void clear_history() {
 }
 
 void restore_from_history(info_t *history, int history_len) {
-    mask_t *mask = gMOAS->mask;
     int i;
     for (i = 0; i < history_len; i++) {
         clear_cell(history[i].x, history[i].y);
@@ -115,11 +115,10 @@ void restore_from_history(info_t *history, int history_len) {
 }
 
 void copy_history(work_t *work) {
-    mask_t *mask = gMOAS->mask;
-    int i = 0, len = mask->history_len;
+    int i = 0, len = gMOAS->mask->history_len;
     work->history = calloc(len, sizeof(info_t));
     for (i = 0; i < len; i++) {
-        work->history[i] = mask->history[i];
+        work->history[i] = gMOAS->mask->history[i];
     }
     work->history_len = len;
 }
@@ -274,7 +273,6 @@ work_t *initial_work(int ntasks, int *top, int *size) {
         }
 
         if (pos >= total) {
-
             // save this history
             // print_history(mask->history, mask->history_len);
             copy_history(&stack[*top]);
@@ -289,7 +287,6 @@ work_t *initial_work(int ntasks, int *top, int *size) {
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
             ++pos;
-
         } else {
             if (mask->history_len == 0) {
                 break;
@@ -448,6 +445,7 @@ void master(const char *filename) {
     read_file(filename, ntasks);
     // Prepare initial work pool
     stack = initial_work(ntasks, &top, &wk_size);
+    assert(stack != NULL);
     print_work_stack(ntasks, stack);
 
     for (slave = 1; slave < ntasks; ++slave)
