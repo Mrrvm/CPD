@@ -365,7 +365,7 @@ void print_slaves_state(int *slave_state, int ntasks) {
     printf("Slave state: ");
 
     for (id = 1; id < ntasks; ++id) {
-        printf("(slave %d - %s)", id, (slave_state[id] == IDLE)?"IDLE":((slave_state[id] == WORKING)?"WORKING":"REQUEST"));         
+        printf("(slave %d - %s)", id, (slave_state[id] == IDLE)?"IDLE":((slave_state[id] == WORKING)?"WORKING":"REQUEST"));
     }
 
     printf("\n");
@@ -458,6 +458,7 @@ void send_work(info_t *history, int size, int id, int tag) {
 
     int i;
     printf("Sending size %d\n", size);
+    assert(size > 0);
     MPI_Send(&size, 1, MPI_INT, id, tag, MPI_COMM_WORLD);
 
     for (i = 0; i < size; i++) {
@@ -552,7 +553,7 @@ void master(const char *filename) {
                         MPI_Send(&msg, 1, MPI_INT, robin, RED_TAG, MPI_COMM_WORLD);
                         slaves_state[robin] = REQUEST;
                     } else {
-                        printf("Master failed to request work\n");  
+                        printf("Master failed to request work\n");
 
                         lost_work++;
 
