@@ -119,7 +119,10 @@ int remove_last_from_history() {
 
 void clear_history() {
     mask_t *mask = gMOAS->mask;
-    mask->history_len = 0;
+
+    while (mask->history_len > 0) {
+        remove_last_from_history();
+    }
 }
 
 void restore_from_history(info_t *history, int history_len) {
@@ -217,7 +220,7 @@ int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
     for (i = 0; i < nsteps; i++) {
         while (*pos < total && gMOAS->known[*pos / gMOAS->n][*pos % gMOAS->n]) {
             ++(*pos);
-            *n = 1;
+            *n = 0;
         }
         if (*pos >= total) {
             gDONE = true;
@@ -226,7 +229,7 @@ int solve_nsteps(int root, int *pos, int *n, int total, int nsteps) {
 
         if (advance_cell(*pos / gMOAS->n, *pos % gMOAS->n, *n)) {
             ++(*pos);
-            *n = 1;
+            *n = 0;
         } else {
             if (mask->history_len == root) {
                 return 0;
@@ -261,11 +264,20 @@ void print_work_stack(int ntasks, work_t *stack) {
 }
 
 work_t *initial_work(int ntasks, int *top, int *size) {
-    int total = 1, acc = gMOAS->n;
+    int total = 0, acc = gMOAS->n;
     work_t *stack;
     int pos = 0;
-    int val = 1;
+    int val = 0;
     mask_t *mask = gMOAS->mask;
+
+    while (1) {
+        if (gMOAS->known[total / gMOAS->n][total % gMOAS->n]) {
+            total++;
+        } else {
+            break;
+        }
+    }
+    total++;
 
     /* Calculate number of starter possibilities according to ntasks */
     while (acc < (ntasks + INIT_BUFF) && total < gMOAS->n) {
@@ -293,6 +305,7 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     while (1) {
         while (pos < total && gMOAS->known[pos / gMOAS->n][pos % gMOAS->n]) {
             ++pos;
+            val = 0;
         }
 
         if (pos >= total) {
@@ -308,12 +321,14 @@ work_t *initial_work(int ntasks, int *top, int *size) {
                                            gMOAS->mask->history_len);
                 val = remove_last_from_history();
             } else {
-                val = 1;
+
+                break;
             }
         }
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n, val)) {
             ++pos;
+            val = 1;
         } else {
             if (mask->history_len == 0) {
                 break;
@@ -323,6 +338,8 @@ work_t *initial_work(int ntasks, int *top, int *size) {
             val = remove_last_from_history();
         }
     }
+
+    assert(*top > 0);
 
     return stack;
 }
@@ -638,7 +655,7 @@ void slave(int my_id) {
                 init_pos = work->history[init_root].x * gMOAS->n +
                            work->history[init_root].y + 1;
                 pos = init_pos;
-                n = 1;
+                n = 0;
                 restore_from_history(work->history, work->history_len);
                 print_grid();
 
