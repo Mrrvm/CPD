@@ -28,7 +28,7 @@ sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
 echo "Compiling Kuduro"
 sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
   "./sshpass -f cpdpass ssh cpd06@cpd-6 -t " \
-  "mpicc -std=gnu11 -O2 -Os -o kuduro-mpi main.c"
+  "mpicc -std=gnu11 -O2 -Os -ffast-math -o kuduro-mpi main.c"
 
 echo "Executing Kuduro"
 sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
