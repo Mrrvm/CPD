@@ -23,6 +23,12 @@ sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
 # sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
 #   "./sshpass -f ./cpdpass scp "$home"my-nodes.txt cpd06@cpd-6:~/my-nodes.txt"
 
+echo "Compiling Kuduro"
+sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
+  "./sshpass -f cpdpass ssh cpd06@cpd-6 -t " \
+  "mpicc -std=gnu11 -O2 -Os -o kuduro-mpi main.c"
+
+echo "Executing Kuduro"
 sshpass -f clusterpass ssh "$user"@cluster.rnl.tecnico.ulisboa.pt -t \
   "./sshpass -f cpdpass ssh cpd06@cpd-6 -t " \
   "time mpirun --hostfile ./my-nodes.txt kuduro-mpi $testfile"
