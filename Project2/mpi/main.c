@@ -263,8 +263,9 @@ work_t *initial_work(int ntasks, int *top, int *size) {
     *size = acc * 2;
     stack = (work_t *)calloc(*size, sizeof(work_t));
     *top = 0;
-    printf("Got %d taskers, %d possibilities, Starting on house %d\n", ntasks,
+    printf("Got %d taskers, %d possibilities, Working until house %d\n", ntasks,
            acc, total);
+    printf("Known grid:%d\n", gMOAS->known[0 / gMOAS->n][0 % gMOAS->n]);
 
     // Explore to depth
     while (1) {
@@ -279,10 +280,12 @@ work_t *initial_work(int ntasks, int *top, int *size) {
             (*top)++;
 
             // backtrack
-            pos = mask->history[mask->history_len - 1].x * gMOAS->n +
-                  mask->history[mask->history_len - 1].y;
+            if (mask->history_len != 0) {
+                pos = mask->history[mask->history_len - 1].x * gMOAS->n +
+                      mask->history[mask->history_len - 1].y;
 
-            remove_last_from_history();
+                remove_last_from_history();
+            }
         }
 
         if (advance_cell(pos / gMOAS->n, pos % gMOAS->n)) {
@@ -393,7 +396,7 @@ void read_file(const char *filename, int ntasks) {
     }
 
     MPI_Bcast(&gMOAS->n_empty, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(info_t));
+    gMOAS->mask->history = calloc(gMOAS->n_empty, sizeof(struct info));
     gMOAS->mask->history_len = 0;
     fclose(sudoku_file);
 }
